@@ -10,15 +10,19 @@ const relays = [
   'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.snort.social',
-  'wss://nostr.wine',
+  // 'wss://nostr.wine',
 ];
 
 export function NostrProvider({ children }: { children: React.ReactNode }) {
   const [pool, setPool] = useState<SimplePool | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [localSecretKey, setLocalSecretKey] = useState<Uint8Array | null>(null);
+  const [localSecretKey, setLocalSecretKeyState] = useState<Uint8Array | null>(
+    null
+  );
   const [userPublicKey, setUserPublicKey] = useState<string | null>(null);
   const [bunkerConnectionToken, setBunkerConnectionToken] = useState<
     string | null
@@ -37,6 +41,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         const newPool = new SimplePool();
         setPool(newPool);
         setIsConnected(true);
+        console.log('Pool initialized');
         setError(null);
       } catch (err) {
         console.error('Failed to initialize Nostr pool:', err);
@@ -45,10 +50,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Only initialize if pool is null
-    if (!pool) {
-      initPool();
-    }
+    // Initialize pool on mount
+    initPool();
 
     return () => {
       if (pool) {
@@ -56,6 +59,55 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []); // Empty dependency array - only run once on mount
+
+  // Check for existing authentication on mount
+  useEffect(() => {
+    const checkExistingAuth = () => {
+      // Check if user has a secret key or bunker connection
+      if (localSecretKey || (bunkerSigner && bunkerStatus === 'connected')) {
+        setIsAuthenticated(true);
+      }
+    };
+
+    checkExistingAuth();
+  }, [localSecretKey, bunkerSigner, bunkerStatus]);
+
+  // Check if app is configured (either with secret key or bunker connection)
+  useEffect(() => {
+    const checkConfiguration = () => {
+      // App is configured if either:
+      // 1. User has a local secret key (secret key mode)
+      // 2. User has a bunker connection token (bunker mode) - we consider them configured
+      //    even if not yet connected, as they have the necessary credentials
+      const hasSecretKey = localSecretKey !== null;
+      const hasBunkerCredentials = bunkerConnectionToken !== null;
+
+      setIsConfigured(hasSecretKey || hasBunkerCredentials);
+    };
+
+    checkConfiguration();
+  }, [localSecretKey, bunkerConnectionToken]);
+
+  // Wrapper function for setting local secret key
+  const setLocalSecretKey = useCallback((sk: Uint8Array) => {
+    setLocalSecretKeyState(sk);
+    setIsAuthenticated(true);
+    setIsConfigured(true);
+  }, []);
+
+  // Logout function
+  const logout = useCallback(() => {
+    setLocalSecretKeyState(null);
+    setUserPublicKey(null);
+    setBunkerConnectionToken(null);
+    setBunkerStatus('disconnected');
+    setBunkerError(null);
+    setBunkerSigner(null);
+    setUserProfile(null);
+    setIsAuthenticated(false);
+    setIsConfigured(false);
+    setEvents([]);
+  }, []);
 
   const fetchUserProfile = useCallback(async () => {
     if (!pool || !userPublicKey) return;
@@ -93,9 +145,9 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
           sig: '',
         };
 
-        const signedEvent = await pool.publish(relays, event);
+        await Promise.all(pool.publish(relays, event));
         console.log('Profile updated successfully');
-        setUserProfile(signedEvent);
+        setUserProfile(event);
       } catch (err) {
         console.error('Failed to update profile:', err);
         setError('Failed to update profile');
@@ -109,30 +161,19 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       try {
         setBunkerStatus('connecting');
         setBunkerError(null);
+        setBunkerConnectionToken(bunkerConnectionToken); // Store the token
 
-        const bunkerInput = parseBunkerInput(bunkerConnectionToken);
+        const bunkerInput = await parseBunkerInput(bunkerConnectionToken);
         if (!bunkerInput) {
           throw new Error('Invalid bunker input');
         }
 
-        const bunkerPointer = bunkerInput.pointer;
         const bunkerPubkey = bunkerInput.pubkey;
 
         console.log('Bunker pubkey:', bunkerPubkey);
         setUserPublicKey(bunkerPubkey);
 
-        const newPool = new SimplePool();
-        setPool(newPool);
-
-        console.log('Pool initialized');
-
-        const bunkerSigner = new BunkerSigner(
-          newPool,
-          bunkerPointer,
-          localSecretKey
-        );
-
-        console.log('Bunker pointer:', bunkerPointer);
+        const bunkerSigner = new BunkerSigner(localSecretKey, bunkerInput);
 
         await bunkerSigner
           .connect()
@@ -140,7 +181,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
             console.log('Bunker connected');
             setBunkerStatus('connected');
             setBunkerSigner(bunkerSigner);
-            setIsConnected(true);
+            setIsAuthenticated(true);
+            setIsConfigured(true);
           })
           .catch(err => {
             console.error('Failed to connect to bunker:', err);
@@ -148,7 +190,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
             setBunkerError(
               err instanceof Error ? err.message : 'Failed to connect to bunker'
             );
-            setIsConnected(false);
+
+            setIsAuthenticated(false);
           });
       } catch (err) {
         console.error('Failed to connect to bunker:', err);
@@ -156,7 +199,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         setBunkerError(
           err instanceof Error ? err.message : 'Failed to connect to bunker'
         );
-        setIsConnected(false);
+        setIsAuthenticated(false);
       }
     },
     [] // Remove pool dependency
@@ -171,7 +214,17 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         const sub = pool.subscribe(relays, filter, {
           onevent(event) {
             console.log('Received Nostr event:', event);
-            setEvents(prev => [event, ...prev.slice(0, 99)]); // Keep last 100 events
+            setEvents(prev => {
+              // Check if event with same ID already exists
+              const eventExists = prev.some(
+                existingEvent => existingEvent.id === event.id
+              );
+              if (eventExists) {
+                return prev; // Return unchanged if event already exists
+              }
+              // Add new event and keep last 100 events
+              return [event, ...prev.slice(0, 99)];
+            });
           },
           oneose() {
             console.log('Subscription ended');
@@ -212,6 +265,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
   const value: NostrContextType = {
     isConnected,
+    isAuthenticated,
+    isConfigured,
     bunkerStatus,
     bunkerError,
     bunkerSigner,
@@ -229,6 +284,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     setBunkerConnectionToken,
     setLocalSecretKey,
     handleBunkerConnectionToken,
+    logout,
   };
 
   return (

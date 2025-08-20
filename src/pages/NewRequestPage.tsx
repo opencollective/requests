@@ -2,20 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
-import { useNostr } from '../contexts/NostrContext';
+import { useNostr } from '../hooks/useNostr';
 
 const NewRequestPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, userProfile, userPublicKey, bunkerSigner, sendEvent } =
+  const { isConfigured, userProfile, userPublicKey, bunkerSigner, sendEvent } =
     useNostr();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not configured
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConfigured) {
       navigate('/login');
     }
-  }, [isConnected, navigate]);
+  }, [isConfigured, navigate]);
 
   const defaultEmail = userProfile?.content
     ? JSON.parse(userProfile.content).email || ''
@@ -25,18 +25,10 @@ const NewRequestPage: React.FC = () => {
     : '';
 
   const defaultValues: RequestFormData = {
-    title: '',
-    description: '',
-    requestType: 'general',
-    priority: 'medium',
-    email: defaultEmail,
     name: defaultName,
-    phone: '',
-    organization: '',
-    expectedCompletionDate: undefined,
-    additionalDetails: '',
-    attachments: [],
-    status: 'pending',
+    email: defaultEmail,
+    subject: '',
+    message: '',
   };
 
   const onSubmit = async (data: RequestFormData) => {
@@ -50,25 +42,15 @@ const NewRequestPage: React.FC = () => {
       const requestEvent = await bunkerSigner.signEvent({
         kind: 30023, // NIP-23: Long-form Content
         content: JSON.stringify({
-          title: data.title,
-          description: data.description,
-          requestType: data.requestType,
-          priority: data.priority,
+          subject: data.subject,
+          message: data.message,
           email: data.email,
           name: data.name,
-          phone: data.phone,
-          organization: data.organization,
-          expectedCompletionDate: data.expectedCompletionDate?.toISOString(),
-          additionalDetails: data.additionalDetails,
-          status: data.status,
           createdAt: new Date().toISOString(),
         }),
         tags: [
           ['d', `request-${Date.now()}`], // Unique identifier
-          ['title', data.title],
-          ['requestType', data.requestType],
-          ['priority', data.priority],
-          ['status', data.status],
+          ['subject', data.subject],
           ['t', 'community-request'], // Topic tag
         ],
         created_at: Math.floor(Date.now() / 1000),
@@ -97,7 +79,7 @@ const NewRequestPage: React.FC = () => {
   };
 
   // Show loading while checking authentication
-  if (!isConnected) {
+  if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
         <div className="text-center">

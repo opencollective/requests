@@ -11,8 +11,11 @@ export interface NostrContextType {
     bunkerConnectionToken: string,
     localSecretKey: Uint8Array
   ) => void;
+  logout: () => void;
 
   isConnected: boolean;
+  isAuthenticated: boolean;
+  isConfigured: boolean; // New property to determine if app should show instead of login
   bunkerStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   bunkerError: string | null;
   bunkerSigner: BunkerSigner | null;

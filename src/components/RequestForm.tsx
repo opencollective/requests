@@ -13,16 +13,6 @@ interface RequestFormProps {
   isEmbed?: boolean;
 }
 
-const requestTypes = [
-  'general',
-  'technical',
-  'feature',
-  'bug',
-  'support',
-  'partnership',
-  'other',
-];
-
 export const RequestForm: React.FC<RequestFormProps> = ({
   defaultValues,
   onSubmit,
@@ -63,98 +53,6 @@ export const RequestForm: React.FC<RequestFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Title *
-            </label>
-            <input
-              type="text"
-              {...register('title')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Brief description of your request"
-            />
-            {errors.title && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.title.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Request Type *
-            </label>
-            <select
-              {...register('requestType')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select a type</option>
-              {requestTypes.map(type => (
-                <option key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </option>
-              ))}
-            </select>
-            {errors.requestType && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.requestType.message}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description *
-          </label>
-          <textarea
-            {...register('description')}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Detailed description of your request"
-          />
-          {errors.description && (
-            <p className="mt-1 text-sm text-red-600">
-              {errors.description.message}
-            </p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Priority *
-            </label>
-            <select
-              {...register('priority')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select priority</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-            {errors.priority && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.priority.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Expected Completion Date
-            </label>
-            <input
-              type="date"
-              {...register('expectedCompletionDate')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
               Name *
             </label>
             <input
@@ -186,42 +84,38 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone
-            </label>
-            <input
-              type="tel"
-              {...register('phone')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="+1 (555) 123-4567"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Organization
-            </label>
-            <input
-              type="text"
-              {...register('organization')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Your organization (optional)"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Subject *
+          </label>
+          <input
+            type="text"
+            {...register('subject')}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Brief description of your request"
+          />
+          {errors.subject && (
+            <p className="mt-1 text-sm text-red-600">
+              {errors.subject.message}
+            </p>
+          )}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Additional Details
+            Message *
           </label>
           <textarea
-            {...register('additionalDetails')}
-            rows={3}
+            {...register('message')}
+            rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Any additional information that might be helpful"
+            placeholder="Detailed description of your request"
           />
+          {errors.message && (
+            <p className="mt-1 text-sm text-red-600">
+              {errors.message.message}
+            </p>
+          )}
         </div>
 
         {userProfile && (

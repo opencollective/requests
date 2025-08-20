@@ -1,0 +1,91 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNostr } from './useNostr';
+
+export interface RequestData {
+  id: string;
+  subject: string;
+  message: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  author: string;
+  timestamp: number;
+}
+
+export function useRequests() {
+  const { isConnected, subscribeToEvents, events, clearEvents } = useNostr();
+  const [requests, setRequests] = useState<RequestData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRequests = useCallback(() => {
+    if (!isConnected) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Subscribe to all community request events (kind 30023 with topic tag)
+      subscribeToEvents({
+        kinds: [30023],
+        '#t': ['community-request'],
+        limit: 100,
+      });
+    } catch {
+      setError('Failed to fetch requests');
+      setIsLoading(false);
+    }
+  }, [isConnected, subscribeToEvents]);
+
+  const refreshRequests = useCallback(() => {
+    clearEvents();
+    fetchRequests();
+  }, [clearEvents, fetchRequests]);
+
+  // Process events into request data
+  useEffect(() => {
+    if (events.length === 0) return;
+
+    const processedRequests: RequestData[] = events
+      .filter(event => event.kind === 30023)
+      .map(event => {
+        try {
+          const content = JSON.parse(event.content);
+          return {
+            id: event.id,
+            subject: content.subject || 'No subject',
+            message: content.message || 'No message',
+            email: content.email || 'No email',
+            name: content.name || 'Anonymous',
+            createdAt:
+              content.createdAt ||
+              new Date(event.created_at * 1000).toISOString(),
+            author: event.pubkey,
+            timestamp: event.created_at,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((request): request is RequestData => request !== null)
+      .sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
+
+    setRequests(processedRequests);
+    setIsLoading(false);
+  }, [events]);
+
+  // Auto-fetch when connected
+  useEffect(() => {
+    if (isConnected) {
+      fetchRequests();
+    }
+  }, [isConnected, fetchRequests]);
+
+  return {
+    requests,
+    isLoading,
+    error,
+    refreshRequests,
+    fetchRequests,
+  };
+}

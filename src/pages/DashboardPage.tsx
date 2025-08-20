@@ -1,29 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, userProfile, userPublicKey, bunkerStatus } = useNostr();
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isConnected) {
-      navigate('/login');
-    }
-  }, [isConnected, navigate]);
-
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
+  const { isConnected, userProfile, userPublicKey, bunkerStatus, logout } =
+    useNostr();
   const profileData = userProfile?.content
     ? JSON.parse(userProfile.content)
     : {};
@@ -81,12 +63,21 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="text-center">
+              <div className="text-center space-y-3">
                 <button
                   onClick={() => navigate('/new-request')}
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
                 >
                   Create New Request
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate('/login');
+                  }}
+                  className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-all duration-200"
+                >
+                  Logout
                 </button>
               </div>
             </div>

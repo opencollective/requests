@@ -12,28 +12,18 @@ const EmbeddableRequestPage: React.FC = () => {
   // Get URL parameters for customization
   const showHeader = searchParams.get('showHeader') !== 'false';
   const redirectUrl = searchParams.get('redirectUrl') || '/';
-  const requestType = searchParams.get('requestType') || 'general';
-  const priority = searchParams.get('priority') || 'medium';
   const title = searchParams.get('title') || '';
   const description = searchParams.get('description') || '';
 
   // Initialize default values
   useEffect(() => {
     setFormDefaultValues({
-      title: title || '',
-      description: description || '',
-      requestType: requestType || 'general',
-      priority: (priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
-      email: '',
       name: '',
-      phone: '',
-      organization: '',
-      expectedCompletionDate: undefined,
-      additionalDetails: '',
-      attachments: [],
-      status: 'pending',
+      email: '',
+      subject: title || 'General Request',
+      message: description || '',
     });
-  }, [requestType, priority, title, description]);
+  }, [title, description]);
 
   const handleCreateRequest = async (data: RequestFormData) => {
     setIsSubmitting(true);
