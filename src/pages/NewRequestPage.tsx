@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import type { RequestFormData } from "../types/RequestFormSchema";
-import { RequestForm } from "../components/RequestForm";
-import { useNostr } from "../contexts/NostrContext";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { RequestFormData } from '../types/RequestFormSchema';
+import { RequestForm } from '../components/RequestForm';
+import { useNostr } from '../contexts/NostrContext';
 
 const NewRequestPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, userProfile, userPublicKey, bunkerSigner, sendEvent } = useNostr();
+  const { isConnected, userProfile, userPublicKey, bunkerSigner, sendEvent } =
+    useNostr();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect to login if not authenticated
@@ -16,27 +17,31 @@ const NewRequestPage: React.FC = () => {
     }
   }, [isConnected, navigate]);
 
-  const defaultEmail = userProfile?.content ? JSON.parse(userProfile.content).email || "" : "";
-  const defaultName = userProfile?.content ? JSON.parse(userProfile.content).name || "" : "";
+  const defaultEmail = userProfile?.content
+    ? JSON.parse(userProfile.content).email || ''
+    : '';
+  const defaultName = userProfile?.content
+    ? JSON.parse(userProfile.content).name || ''
+    : '';
 
   const defaultValues: RequestFormData = {
-    title: "",
-    description: "",
-    requestType: "general",
-    priority: "medium",
+    title: '',
+    description: '',
+    requestType: 'general',
+    priority: 'medium',
     email: defaultEmail,
     name: defaultName,
-    phone: "",
-    organization: "",
+    phone: '',
+    organization: '',
     expectedCompletionDate: undefined,
-    additionalDetails: "",
+    additionalDetails: '',
     attachments: [],
-    status: "pending",
+    status: 'pending',
   };
 
   const onSubmit = async (data: RequestFormData) => {
     if (!bunkerSigner || !userPublicKey) {
-      throw new Error("Not authenticated");
+      throw new Error('Not authenticated');
     }
 
     setIsSubmitting(true);
@@ -59,12 +64,12 @@ const NewRequestPage: React.FC = () => {
           createdAt: new Date().toISOString(),
         }),
         tags: [
-          ["d", `request-${Date.now()}`], // Unique identifier
-          ["title", data.title],
-          ["requestType", data.requestType],
-          ["priority", data.priority],
-          ["status", data.status],
-          ["t", "community-request"], // Topic tag
+          ['d', `request-${Date.now()}`], // Unique identifier
+          ['title', data.title],
+          ['requestType', data.requestType],
+          ['priority', data.priority],
+          ['status', data.status],
+          ['t', 'community-request'], // Topic tag
         ],
         created_at: Math.floor(Date.now() / 1000),
       });
@@ -73,22 +78,22 @@ const NewRequestPage: React.FC = () => {
       await sendEvent(requestEvent);
 
       // Navigate to success page or dashboard
-      navigate("/dashboard", { 
-        state: { 
-          message: "Request submitted successfully!",
-          requestId: requestEvent.id 
-        } 
+      navigate('/dashboard', {
+        state: {
+          message: 'Request submitted successfully!',
+          requestId: requestEvent.id,
+        },
       });
     } catch (error) {
-      console.error("Error submitting request:", error);
-      throw new Error("Failed to submit request");
+      console.error('Error submitting request:', error);
+      throw new Error('Failed to submit request');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
-    navigate("/dashboard");
+    navigate('/dashboard');
   };
 
   // Show loading while checking authentication
@@ -114,7 +119,7 @@ const NewRequestPage: React.FC = () => {
             Tell us about your community request
           </p>
         </div>
-        
+
         <RequestForm
           defaultValues={defaultValues}
           onSubmit={onSubmit}

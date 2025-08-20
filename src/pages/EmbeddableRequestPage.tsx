@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import type { RequestFormData } from "../types/RequestFormSchema";
-import { RequestForm } from "../components/RequestForm";
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import type { RequestFormData } from '../types/RequestFormSchema';
+import { RequestForm } from '../components/RequestForm';
 
 const EmbeddableRequestPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formDefaultValues, setFormDefaultValues] = useState<RequestFormData | null>(null);
+  const [formDefaultValues, setFormDefaultValues] =
+    useState<RequestFormData | null>(null);
 
   // Get URL parameters for customization
   const showHeader = searchParams.get('showHeader') !== 'false';
@@ -19,18 +20,18 @@ const EmbeddableRequestPage: React.FC = () => {
   // Initialize default values
   useEffect(() => {
     setFormDefaultValues({
-      title: title || "",
-      description: description || "",
-      requestType: requestType || "general",
-      priority: (priority as "low" | "medium" | "high" | "urgent") || "medium",
-      email: "",
-      name: "",
-      phone: "",
-      organization: "",
+      title: title || '',
+      description: description || '',
+      requestType: requestType || 'general',
+      priority: (priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
+      email: '',
+      name: '',
+      phone: '',
+      organization: '',
       expectedCompletionDate: undefined,
-      additionalDetails: "",
+      additionalDetails: '',
       attachments: [],
-      status: "pending",
+      status: 'pending',
     });
   }, [requestType, priority, title, description]);
 
@@ -39,35 +40,41 @@ const EmbeddableRequestPage: React.FC = () => {
     try {
       // For embeddable version, we'll just send the data to the parent window
       // In a real implementation, you might want to send this to a backend or Nostr relay
-      
+
       // Send message to parent window if embedded
       if (window.parent !== window) {
-        window.parent.postMessage({
-          type: 'REQUEST_CREATED',
-          data: data,
-          timestamp: new Date().toISOString()
-        }, '*');
+        window.parent.postMessage(
+          {
+            type: 'REQUEST_CREATED',
+            data: data,
+            timestamp: new Date().toISOString(),
+          },
+          '*'
+        );
       }
-      
+
       // Show success message
-      alert("Request submitted successfully!");
-      
+      alert('Request submitted successfully!');
+
       // Redirect after a short delay
       setTimeout(() => {
         window.location.href = redirectUrl;
       }, 1500);
     } catch (error) {
-      console.error("Error creating request:", error);
-      
+      console.error('Error creating request:', error);
+
       // Send error message to parent window if embedded
       if (window.parent !== window) {
-        window.parent.postMessage({
-          type: 'REQUEST_ERROR',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }, '*');
+        window.parent.postMessage(
+          {
+            type: 'REQUEST_ERROR',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          '*'
+        );
       }
-      
-      alert("Error submitting request. Please try again.");
+
+      alert('Error submitting request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -76,11 +83,14 @@ const EmbeddableRequestPage: React.FC = () => {
   const handleCancel = () => {
     // Send cancel message to parent window if embedded
     if (window.parent !== window) {
-      window.parent.postMessage({
-        type: 'REQUEST_CANCELLED'
-      }, '*');
+      window.parent.postMessage(
+        {
+          type: 'REQUEST_CANCELLED',
+        },
+        '*'
+      );
     }
-    
+
     // Redirect to cancel URL or default
     const cancelUrl = searchParams.get('cancelUrl') || redirectUrl;
     window.location.href = cancelUrl;
@@ -103,11 +113,13 @@ const EmbeddableRequestPage: React.FC = () => {
       <div className="w-full px-4 py-4">
         {showHeader && (
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Community Request</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Community Request
+            </h1>
             <p className="text-gray-600">Get in touch with your request here</p>
           </div>
         )}
-        
+
         <RequestForm
           defaultValues={formDefaultValues}
           onSubmit={handleCreateRequest}

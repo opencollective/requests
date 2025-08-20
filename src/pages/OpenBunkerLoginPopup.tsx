@@ -4,14 +4,17 @@ export const OpenBunkerLoginPopup: React.FC = () => {
   const handleOpenBunkerLogin = () => {
     // In a real implementation, this would redirect to OpenBunker
     // For now, we'll simulate the process
-    const mockToken = "bunker://mock-token-" + Date.now();
-    
+    const mockToken = 'bunker://mock-token-' + Date.now();
+
     // Send message to parent window
     if (window.opener) {
-      window.opener.postMessage({
-        type: 'openbunker-auth-success',
-        secretKey: mockToken
-      }, '*');
+      window.opener.postMessage(
+        {
+          type: 'openbunker-auth-success',
+          secretKey: mockToken,
+        },
+        '*'
+      );
       window.close();
     }
   };
@@ -31,9 +34,10 @@ export const OpenBunkerLoginPopup: React.FC = () => {
         <div className="space-y-6">
           <div className="text-center">
             <p className="text-sm text-gray-500 mb-4">
-              This is a demo implementation. In production, this would redirect to OpenBunker for OAuth authentication.
+              This is a demo implementation. In production, this would redirect
+              to OpenBunker for OAuth authentication.
             </p>
-            
+
             <button
               onClick={handleOpenBunkerLogin}
               className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200"
@@ -44,7 +48,8 @@ export const OpenBunkerLoginPopup: React.FC = () => {
 
           <div className="border-t pt-6">
             <p className="text-xs text-gray-400 text-center">
-              OpenBunker provides secure Nostr key management through OAuth providers like Discord.
+              OpenBunker provides secure Nostr key management through OAuth
+              providers like Discord.
             </p>
           </div>
         </div>

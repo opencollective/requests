@@ -1,6 +1,10 @@
-
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { NostrProvider } from './contexts/NostrContext';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
+import { NostrProvider } from './contexts/NostrProvider';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import NewRequestPage from './pages/NewRequestPage';
@@ -18,7 +22,10 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/new-request" element={<NewRequestPage />} />
             <Route path="/embed" element={<EmbeddableRequestPage />} />
-            <Route path="/openbunker-login-popup" element={<OpenBunkerLoginPopup />} />
+            <Route
+              path="/openbunker-login-popup"
+              element={<OpenBunkerLoginPopup />}
+            />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>

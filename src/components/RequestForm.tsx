@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import type { RequestFormData } from "../types/RequestFormSchema";
-import { requestFormSchema } from "../types/RequestFormSchema";
-import { useNostr } from "../contexts/NostrContext";
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { RequestFormData } from '../types/RequestFormSchema';
+import { requestFormSchema } from '../types/RequestFormSchema';
+import { useNostr } from '../hooks/useNostr';
 
 interface RequestFormProps {
   defaultValues: RequestFormData;
@@ -14,13 +14,13 @@ interface RequestFormProps {
 }
 
 const requestTypes = [
-  "general",
-  "technical",
-  "feature",
-  "bug",
-  "support",
-  "partnership",
-  "other"
+  'general',
+  'technical',
+  'feature',
+  'bug',
+  'support',
+  'partnership',
+  'other',
 ];
 
 export const RequestForm: React.FC<RequestFormProps> = ({
@@ -28,7 +28,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   onSubmit,
   onCancel,
   isSubmitting,
-  isEmbed = false
+  isEmbed = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const { userProfile } = useNostr();
@@ -47,13 +47,13 @@ export const RequestForm: React.FC<RequestFormProps> = ({
       setError(null);
       await onSubmit(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
   return (
     <div className={`max-w-2xl mx-auto ${isEmbed ? 'p-4' : 'p-8'}`}>
-      <form onSubmit={handleSubmit(handleFormSubmit as any)} className="space-y-6">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {error}
@@ -67,12 +67,14 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="text"
-              {...register("title")}
+              {...register('title')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Brief description of your request"
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.title.message}
+              </p>
             )}
           </div>
 
@@ -81,18 +83,20 @@ export const RequestForm: React.FC<RequestFormProps> = ({
               Request Type *
             </label>
             <select
-              {...register("requestType")}
+              {...register('requestType')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a type</option>
-              {requestTypes.map((type) => (
+              {requestTypes.map(type => (
                 <option key={type} value={type}>
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </option>
               ))}
             </select>
             {errors.requestType && (
-              <p className="mt-1 text-sm text-red-600">{errors.requestType.message}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.requestType.message}
+              </p>
             )}
           </div>
         </div>
@@ -102,13 +106,15 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             Description *
           </label>
           <textarea
-            {...register("description")}
+            {...register('description')}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Detailed description of your request"
           />
           {errors.description && (
-            <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {errors.description.message}
+            </p>
           )}
         </div>
 
@@ -118,7 +124,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
               Priority *
             </label>
             <select
-              {...register("priority")}
+              {...register('priority')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select priority</option>
@@ -128,7 +134,9 @@ export const RequestForm: React.FC<RequestFormProps> = ({
               <option value="urgent">Urgent</option>
             </select>
             {errors.priority && (
-              <p className="mt-1 text-sm text-red-600">{errors.priority.message}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.priority.message}
+              </p>
             )}
           </div>
 
@@ -138,7 +146,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="date"
-              {...register("expectedCompletionDate")}
+              {...register('expectedCompletionDate')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -151,7 +159,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="text"
-              {...register("name")}
+              {...register('name')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Your full name"
             />
@@ -166,12 +174,14 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="email"
-              {...register("email")}
+              {...register('email')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="your.email@example.com"
             />
             {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+              <p className="mt-1 text-sm text-red-600">
+                {errors.email.message}
+              </p>
             )}
           </div>
         </div>
@@ -183,7 +193,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="tel"
-              {...register("phone")}
+              {...register('phone')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="+1 (555) 123-4567"
             />
@@ -195,7 +205,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             </label>
             <input
               type="text"
-              {...register("organization")}
+              {...register('organization')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Your organization (optional)"
             />
@@ -207,7 +217,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             Additional Details
           </label>
           <textarea
-            {...register("additionalDetails")}
+            {...register('additionalDetails')}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Any additional information that might be helpful"
@@ -217,7 +227,10 @@ export const RequestForm: React.FC<RequestFormProps> = ({
         {userProfile && (
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
             <p className="text-sm text-blue-700">
-              <strong>Connected as:</strong> {userProfile.content ? JSON.parse(userProfile.content).name || 'Unknown' : 'Unknown'}
+              <strong>Connected as:</strong>{' '}
+              {userProfile.content
+                ? JSON.parse(userProfile.content).name || 'Unknown'
+                : 'Unknown'}
             </p>
           </div>
         )}
@@ -228,7 +241,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             disabled={isSubmitting}
             className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Submitting..." : "Submit Request"}
+            {isSubmitting ? 'Submitting...' : 'Submit Request'}
           </button>
           <button
             type="button"

@@ -1,5 +1,5 @@
-import React from "react";
-import { LoginOptions } from "../components/LoginOptions";
+import React from 'react';
+import { LoginOptions } from '../components/LoginOptions';
 
 export const LoginPage: React.FC = () => {
   return (
@@ -8,7 +8,7 @@ export const LoginPage: React.FC = () => {
         <div className="max-w-md mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Welcome to{" "}
+              Welcome to{' '}
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 Community Requests
               </span>

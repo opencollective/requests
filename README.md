@@ -14,18 +14,20 @@ A React-based community request management system that uses OpenBunker for Nostr
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm (recommended) or npm
 
 ### Installation
 
 1. Clone the repository
 2. Install dependencies:
+
    ```bash
    pnpm install
    ```
 
 3. Start the development server:
+
    ```bash
    pnpm dev
    ```
@@ -37,11 +39,13 @@ A React-based community request management system that uses OpenBunker for Nostr
 The app supports two authentication methods:
 
 ### 1. OpenBunker (Recommended)
+
 - Uses Discord OAuth to generate new Nostr keys
 - Secure remote signing through bunker servers
 - No need to manage private keys locally
 
 ### 2. Direct Nostr Secret Key
+
 - Use existing Nostr secret keys
 - Direct connection to relays
 - Full control over your keys
@@ -62,11 +66,12 @@ The app supports two authentication methods:
 The request form can be embedded in other websites:
 
 ```html
-<iframe 
-  src="http://localhost:5173/embed?showHeader=false&requestType=technical" 
-  width="100%" 
+<iframe
+  src="http://localhost:5173/embed?showHeader=false&requestType=technical"
+  width="100%"
   height="600px"
-  frameborder="0">
+  frameborder="0"
+>
 </iframe>
 ```
 
@@ -85,7 +90,7 @@ The request form can be embedded in other websites:
 The embedded form communicates with the parent window:
 
 ```javascript
-window.addEventListener('message', (event) => {
+window.addEventListener('message', event => {
   if (event.data.type === 'REQUEST_CREATED') {
     console.log('Request submitted:', event.data.data);
   } else if (event.data.type === 'REQUEST_ERROR') {
@@ -186,6 +191,7 @@ MIT License - see LICENSE file for details
 ## Support
 
 For issues and questions:
+
 - Open an issue on GitHub
 - Check the Nostr documentation
 - Review OpenBunker documentation

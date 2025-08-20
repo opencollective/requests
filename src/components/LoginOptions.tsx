@@ -1,57 +1,64 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { useNostr } from "../contexts/NostrContext";
-import { generateSecretKey } from "nostr-tools";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useNostr } from '../hooks/useNostr';
+import { generateSecretKey } from 'nostr-tools';
 
 export const LoginOptions: React.FC = () => {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [popup, setPopup] = useState<Window | null>(null);
-  const openBunkerUrl = import.meta.env.VITE_OPENBUNKER_POPUP_URL || "/openbunker-login-popup";
+  const openBunkerUrl =
+    import.meta.env.VITE_OPENBUNKER_POPUP_URL || '/openbunker-login-popup';
   const { handleBunkerConnectionToken } = useNostr();
   const navigate = useNavigate();
 
-  const handleOpenBunkerSuccess = useCallback(async (bunkerConnectionToken: string) => {
-    try {
-      const sk = generateSecretKey();
-      await handleBunkerConnectionToken(bunkerConnectionToken, sk);
-      navigate("/dashboard");
-    } catch (err) {
-      console.error("Failed to complete OpenBunker authentication:", err);
-    }
-  }, [handleBunkerConnectionToken, navigate]);
+  const handleOpenBunkerSuccess = useCallback(
+    async (bunkerConnectionToken: string) => {
+      try {
+        const sk = generateSecretKey();
+        await handleBunkerConnectionToken(bunkerConnectionToken, sk);
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Failed to complete OpenBunker authentication:', err);
+      }
+    },
+    [handleBunkerConnectionToken, navigate]
+  );
 
   // Set up the callback function for the popup
   useEffect(() => {
     // Define the callback function on the window object (kept for backward compatibility)
-    (window as { openBunkerCallback?: (secretKey: string) => void }).openBunkerCallback = (secretKey: string) => {
+    (
+      window as { openBunkerCallback?: (secretKey: string) => void }
+    ).openBunkerCallback = (secretKey: string) => {
       handleOpenBunkerSuccess(secretKey);
     };
 
     // Set up message listener for cross-origin communication
     const handleMessage = (event: MessageEvent) => {
       // Handle messages from OpenBunker popup (cross-origin)
-      if (event.data.type === "openbunker-auth-success") {
-        console.log("Received OpenBunker auth success message:", event.data);
+      if (event.data.type === 'openbunker-auth-success') {
+        console.log('Received OpenBunker auth success message:', event.data);
         handleOpenBunkerSuccess(event.data.secretKey);
       }
     };
 
-    window.addEventListener("message", handleMessage);
+    window.addEventListener('message', handleMessage);
 
     return () => {
       // Clean up
-      delete (window as { openBunkerCallback?: (secretKey: string) => void }).openBunkerCallback;
-      window.removeEventListener("message", handleMessage);
+      delete (window as { openBunkerCallback?: (secretKey: string) => void })
+        .openBunkerCallback;
+      window.removeEventListener('message', handleMessage);
     };
   }, [handleOpenBunkerSuccess]);
 
   const handleOpenBunkerPopup = () => {
-    console.log("handleOpenBunkerPopup");
+    console.log('handleOpenBunkerPopup');
     // Create a popup with the configured OpenBunker URL
     const popupWindow = window.open(
       openBunkerUrl,
-      "openbunker-login",
-      "width=500,height=600,scrollbars=yes,resizable=yes",
+      'openbunker-login',
+      'width=500,height=600,scrollbars=yes,resizable=yes'
     );
 
     if (popupWindow) {
@@ -59,7 +66,7 @@ export const LoginOptions: React.FC = () => {
 
       // Check if popup is closed
       const checkClosed = setInterval(() => {
-        console.log("checkClosed", popupWindow.closed);
+        console.log('checkClosed', popupWindow.closed);
         if (popupWindow.closed) {
           clearInterval(checkClosed);
           setPopup(null);
@@ -130,7 +137,7 @@ export const LoginOptions: React.FC = () => {
               Configure via VITE_OPENBUNKER_POPUP_URL environment variable
             </p>
           </div>
-          
+
           <button
             onClick={handleOpenBunkerPopup}
             disabled={!!popup}
@@ -151,8 +158,8 @@ export const LoginOptions: React.FC = () => {
             </svg>
             <span>
               {popup
-                ? "OpenBunker Login in Progress..."
-                : "Authenticate with OpenBunker"}
+                ? 'OpenBunker Login in Progress...'
+                : 'Authenticate with OpenBunker'}
             </span>
           </button>
         </div>
@@ -181,25 +188,27 @@ export const LoginOptions: React.FC = () => {
 
 // Simple secret key login component
 const SecretKeyLogin: React.FC = () => {
-  const [secretKey, setSecretKey] = useState("");
-  const [error, setError] = useState("");
+  const [secretKey, setSecretKey] = useState('');
+  const [error, setError] = useState('');
   const { setLocalSecretKey } = useNostr();
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!secretKey.trim()) {
-      setError("Please enter a secret key");
+      setError('Please enter a secret key');
       return;
     }
 
     try {
       // Convert hex string to Uint8Array
-      const keyBytes = new Uint8Array(secretKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      const keyBytes = new Uint8Array(
+        secretKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+      );
       setLocalSecretKey(keyBytes);
-      navigate("/dashboard");
-    } catch (err) {
-      setError("Invalid secret key format");
+      navigate('/dashboard');
+    } catch {
+      setError('Invalid secret key format');
     }
   };
 
@@ -212,7 +221,7 @@ const SecretKeyLogin: React.FC = () => {
         <input
           type="password"
           value={secretKey}
-          onChange={(e) => setSecretKey(e.target.value)}
+          onChange={e => setSecretKey(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Enter your Nostr secret key"
         />
