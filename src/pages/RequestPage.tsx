@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
-import { useUnauthenticatedRequests } from '../hooks/useUnauthenticatedRequests';
+
 import { generateSecretKey } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import type { OpenBunkerResponse } from '../api/openbunker';
 import { RequestForm } from '../components/RequestForm';
 import { EventQueueHeader } from '../components/EventQueueHeader';
+import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,21 +20,21 @@ const RequestPage: React.FC = () => {
     handleBunkerConnectionToken,
     bunkerStatus,
     bunkerError,
+    bunkerPublicKey,
+    localSecretKey,
     queue,
     isProcessing,
     removeFromQueue,
     clearQueue,
   } = useNostr();
 
-  const { submitUnauthenticatedRequest, isSubmitting, error } =
-    useUnauthenticatedRequests();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [bunkerResponse, setBunkerResponse] =
     useState<OpenBunkerResponse | null>(null);
   const [popup, setPopup] = useState<Window | null>(null);
-  const [isAuthenticatedSubmitting, setIsAuthenticatedSubmitting] =
-    useState(false);
 
   const openBunkerUrl =
     import.meta.env.VITE_OPENBUNKER_POPUP_URL || '/openbunker-login-popup';
@@ -90,23 +91,18 @@ const RequestPage: React.FC = () => {
   }, [openBunkerUrl, popup]);
 
   const onSubmit = async (data: RequestFormData) => {
-    if (userPublicKey && bunkerSigner) {
-      // Authenticated submission
-      await handleAuthenticatedSubmission(data);
-    } else {
-      // Unauthenticated submission
-      await handleUnauthenticatedSubmission(data);
-    }
+    // Both authenticated and unauthenticated submissions now use the same approach
+    // Events are submitted to the queue but not yet signed
+    await handleSubmission(data);
   };
 
-  const handleAuthenticatedSubmission = async (data: RequestFormData) => {
-    if (!bunkerSigner || !userPublicKey) {
-      throw new Error('Not authenticated');
-    }
+  const handleSubmission = async (data: RequestFormData) => {
+    setIsSubmitting(true);
+    setError(null);
 
-    setIsAuthenticatedSubmitting(true);
     try {
-      const requestEvent = await bunkerSigner.signEvent({
+      // Create the event data (unsigned)
+      const eventData = {
         kind: 30023, // NIP-23: Long-form Content
         content: JSON.stringify({
           subject: data.subject,
@@ -114,6 +110,7 @@ const RequestPage: React.FC = () => {
           email: data.email,
           name: data.name,
           createdAt: new Date().toISOString(),
+          isAuthenticated: !!userPublicKey, // Track if this was submitted by authenticated user
         }),
         tags: [
           ['d', `request-${Date.now()}`], // Unique identifier
@@ -121,32 +118,55 @@ const RequestPage: React.FC = () => {
           ['t', 'community-request'], // Topic tag
         ],
         created_at: Math.floor(Date.now() / 1000),
-      });
+      };
 
-      // Use submitEvent instead of sendEvent to add to queue
-      submitEvent(requestEvent);
+      // For authenticated users, we can create a proper event structure
+      if (userPublicKey && bunkerSigner) {
+        // Create unsigned event - will be signed when processed from queue
+        const unsignedEvent = {
+          ...eventData,
+          id: '', // Will be generated when signed
+          sig: '', // Will be generated when signed
+          pubkey: userPublicKey, // Set the public key
+        };
 
-      navigate('/dashboard', {
-        state: {
-          message: 'Request submitted successfully!',
-          requestId: requestEvent.id,
-        },
-      });
+        // Add to event queue for later signing and sending
+        submitEvent(unsignedEvent);
+
+        navigate('/dashboard', {
+          state: {
+            message:
+              'Request submitted successfully! It will be signed and sent shortly.',
+            requestId: `pending-${Date.now()}`,
+          },
+        });
+      } else {
+        // For unauthenticated users, create a temporary event structure
+        const tempEvent = {
+          ...eventData,
+          id: `temp-${Date.now()}`,
+          sig: '',
+          pubkey: '', // No public key for unauthenticated users
+        };
+
+        // Add to event queue (will be handled specially for unauthenticated requests)
+        submitEvent(tempEvent);
+
+        // Show success message
+        setShowSuccess(true);
+        setBunkerResponse({
+          success: true,
+          message:
+            'Request submitted successfully! It will be processed shortly.',
+        });
+      }
     } catch (error) {
       console.error('Error submitting request:', error);
-      throw new Error('Failed to submit request');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to submit request';
+      setError(errorMessage);
     } finally {
-      setIsAuthenticatedSubmitting(false);
-    }
-  };
-
-  const handleUnauthenticatedSubmission = async (data: RequestFormData) => {
-    try {
-      const response = await submitUnauthenticatedRequest(data);
-      setBunkerResponse(response);
-      setShowSuccess(true);
-    } catch (err) {
-      console.error('Failed to submit request:', err);
+      setIsSubmitting(false);
     }
   };
 
@@ -174,13 +194,12 @@ const RequestPage: React.FC = () => {
       bunkerResponse?.bunkerConnectionToken
     ) {
       handleOpenBunkerSuccess(bunkerResponse.bunkerConnectionToken);
+    } else if (bunkerResponse?.success === true) {
+      // Request was queued successfully, go to dashboard
+      navigate('/dashboard');
     } else {
       handleContinueToOpenBunker();
     }
-  };
-
-  const handleLogin = () => {
-    navigate('/login');
   };
 
   if (showSuccess) {
@@ -213,7 +232,7 @@ const RequestPage: React.FC = () => {
                 {bunkerResponse?.success === false
                   ? 'Authentication required. Please complete the OpenBunker setup.'
                   : bunkerResponse?.success === true
-                    ? 'Your request has been processed. Setting up your authentication...'
+                    ? 'Your request has been queued and will be processed shortly. You can view the queue status on the dashboard.'
                     : 'Your request has been sent to OpenBunker. They will handle your authentication and identity setup.'}
               </p>
 
@@ -241,7 +260,7 @@ const RequestPage: React.FC = () => {
                   {bunkerResponse?.success === false
                     ? 'Authenticate with OpenBunker'
                     : bunkerResponse?.success === true
-                      ? 'Complete Setup'
+                      ? 'Go to Dashboard'
                       : 'Continue to OpenBunker'}
                 </button>
 
@@ -277,124 +296,13 @@ const RequestPage: React.FC = () => {
             onRemoveFromQueue={removeFromQueue}
             onClearQueue={clearQueue}
           />
-
-          {/* Connection Status Section */}
-          <div className="max-w-md mx-auto mb-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Connection Status
-              </h3>
-
-              <div className="space-y-3">
-                {/* Nostr Connection Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Nostr Network:</span>
-                  <div className="flex items-center">
-                    <div
-                      className={`w-3 h-3 rounded-full mr-2 ${
-                        isConnected ? 'bg-green-500' : 'bg-red-500'
-                      }`}
-                    ></div>
-                    <span
-                      className={`text-sm font-medium ${
-                        isConnected ? 'text-green-700' : 'text-red-700'
-                      }`}
-                    >
-                      {isConnected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Authentication Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Authentication:</span>
-                  <div className="flex items-center">
-                    <div
-                      className={`w-3 h-3 rounded-full mr-2 ${
-                        userPublicKey ? 'bg-green-500' : 'bg-yellow-500'
-                      }`}
-                    ></div>
-                    <span
-                      className={`text-sm font-medium ${
-                        userPublicKey ? 'text-green-700' : 'text-yellow-700'
-                      }`}
-                    >
-                      {userPublicKey ? 'Authenticated' : 'Not Authenticated'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bunker Status (if applicable) */}
-                {userPublicKey && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">
-                      Bunker Status:
-                    </span>
-                    <div className="flex items-center">
-                      <div
-                        className={`w-3 h-3 rounded-full mr-2 ${
-                          bunkerStatus === 'connected'
-                            ? 'bg-green-500'
-                            : bunkerStatus === 'connecting'
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                        }`}
-                      ></div>
-                      <span
-                        className={`text-sm font-medium ${
-                          bunkerStatus === 'connected'
-                            ? 'text-green-700'
-                            : bunkerStatus === 'connecting'
-                              ? 'text-yellow-700'
-                              : 'bg-red-700'
-                        }`}
-                      >
-                        {bunkerStatus === 'connected'
-                          ? 'Connected'
-                          : bunkerStatus === 'connecting'
-                            ? 'Connecting'
-                            : 'Disconnected'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* User Public Key Display */}
-                {userPublicKey && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <span className="text-xs text-gray-500 block text-left mb-1">
-                      Public Key:
-                    </span>
-                    <code className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded break-all">
-                      {userPublicKey.slice(0, 16)}...{userPublicKey.slice(-8)}
-                    </code>
-                  </div>
-                )}
-              </div>
-
-              {/* Login Button for unauthenticated users */}
-              {!userPublicKey && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={handleLogin}
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-medium"
-                  >
-                    Login to Submit Authenticated Request
-                  </button>
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Or submit anonymously below
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         <RequestForm
           defaultValues={defaultValues}
           onSubmit={onSubmit}
           onCancel={handleCancel}
-          isSubmitting={isSubmitting || isAuthenticatedSubmitting}
+          isSubmitting={isSubmitting}
         />
 
         {error && (
@@ -414,6 +322,19 @@ const RequestPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Connection Status Box at the bottom */}
+        <div className="max-w-2xl mx-auto mt-8">
+          <ConnectionStatusBox
+            isConnected={isConnected}
+            userPublicKey={userPublicKey}
+            bunkerStatus={bunkerStatus}
+            bunkerPublicKey={bunkerPublicKey}
+            localSecretKey={localSecretKey}
+            isAuthenticated={!!userPublicKey}
+            showLoginButton={true}
+          />
+        </div>
       </div>
     </div>
   );

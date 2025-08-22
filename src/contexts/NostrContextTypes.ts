@@ -43,7 +43,7 @@ export interface UserAuthenticationState {
 export interface SecretKeyAuthState {
   localSecretKey: Uint8Array | null;
   secretKeyError: string | null;
-  secretKeyLogout: () => void;
+  secretKeyLogout: () => Promise<void>;
 }
 
 // Bunker authentication specific state
@@ -61,12 +61,12 @@ export interface BunkerAuthState {
   setLocalSecretKey: (sk: Uint8Array) => void;
   bunkerPublicKey: string | null; // Public key from the bunker
 
-  bunkerLogout: () => void;
+  bunkerLogout: () => Promise<void>;
 }
 
 // Callbacks for authenticated operations
 export interface AuthenticatedCallbacks {
-  logout: () => void;
+  logout: () => Promise<void>;
   sendVerifiedEvent: (event: VerifiedEvent) => Promise<void>;
   sendEvent: (event: Event) => Promise<void>;
   submitEvent: (event: Event) => void; // New method for queue-based submission
