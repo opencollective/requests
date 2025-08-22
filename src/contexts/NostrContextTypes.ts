@@ -1,6 +1,25 @@
 import type { Event, Filter, SimplePool, VerifiedEvent } from 'nostr-tools';
 import type { BunkerSigner } from 'nostr-tools/nip46';
 
+// Event queue item for pending events
+export interface EventQueueItem {
+  id: string;
+  event: Event;
+  timestamp: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+}
+
+// Event queue state
+export interface EventQueueState {
+  queue: EventQueueItem[];
+  isProcessing: boolean;
+  addToQueue: (event: Event) => void;
+  removeFromQueue: (id: string) => void;
+  clearQueue: () => void;
+  processQueue: () => Promise<void>;
+}
+
 // Pool and general Nostr connection state (no authentication required)
 export interface NostrConnectionState {
   pool: SimplePool | null;
@@ -40,6 +59,7 @@ export interface BunkerAuthState {
   bunkerSigner: BunkerSigner | null;
   localSecretKey: Uint8Array | null; // Local secret key used with bunker
   setLocalSecretKey: (sk: Uint8Array) => void;
+  bunkerPublicKey: string | null; // Public key from the bunker
 
   bunkerLogout: () => void;
 }
@@ -49,6 +69,7 @@ export interface AuthenticatedCallbacks {
   logout: () => void;
   sendVerifiedEvent: (event: VerifiedEvent) => Promise<void>;
   sendEvent: (event: Event) => Promise<void>;
+  submitEvent: (event: Event) => void; // New method for queue-based submission
 }
 
 export interface NostrContextType
@@ -56,4 +77,5 @@ export interface NostrContextType
     UserAuthenticationState,
     SecretKeyAuthState,
     BunkerAuthState,
+    EventQueueState,
     AuthenticatedCallbacks {}

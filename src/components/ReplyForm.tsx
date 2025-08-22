@@ -11,7 +11,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
   requestId,
   onReplyAdded,
 }) => {
-  const { isAuthenticated, userPublicKey, sendEvent, bunkerSigner } =
+  const { isAuthenticated, userPublicKey, submitEvent, bunkerSigner } =
     useNostr();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,8 +45,8 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
         created_at: Math.floor(Date.now() / 1000),
       });
 
-      // Send the signed event
-      await sendEvent(replyEvent);
+      // Use submitEvent to add to queue instead of sending immediately
+      submitEvent(replyEvent);
 
       // Clear form and notify parent with the new event
       setMessage('');

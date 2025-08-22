@@ -8,6 +8,7 @@ import {
   useBunkerAuthState,
   useUserAuthenticationState,
 } from '../hooks/useNostrStates';
+import { useEventQueue } from '../hooks/useEventQueue';
 
 export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Use custom hooks for different state management
@@ -15,12 +16,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const secretKeyAuth = useSecretKeyAuthState();
   const bunkerAuth = useBunkerAuthState();
   const userAuth = useUserAuthenticationState(secretKeyAuth, bunkerAuth);
-
-  // Logout function that clears all states
-  const logout = useCallback(() => {
-    secretKeyAuth.secretKeyLogout();
-    bunkerAuth.bunkerLogout();
-  }, [secretKeyAuth, bunkerAuth]);
 
   // Send event (requires authentication)
   const sendVerifiedEvent = useCallback(
@@ -63,6 +58,33 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     [signAndSendEvent]
   );
 
+  // Initialize event queue with the sendEvent function
+  const eventQueue = useEventQueue(sendEvent);
+
+  // Logout function that clears all states
+  const logout = useCallback(() => {
+    secretKeyAuth.secretKeyLogout();
+    bunkerAuth.bunkerLogout();
+    eventQueue.clearQueue();
+  }, [secretKeyAuth, bunkerAuth, eventQueue]);
+
+  // New submitEvent function that adds events to the queue
+  const submitEvent = useCallback(
+    (event: Event) => {
+      eventQueue.addToQueue(event);
+      console.log('Event added to queue:', event);
+    },
+    [eventQueue]
+  );
+
+  // Process queue when authentication becomes available
+  React.useEffect(() => {
+    if (userAuth.isAuthenticated && eventQueue.queue.length > 0) {
+      // Try to process any pending events in the queue
+      eventQueue.processQueue();
+    }
+  }, [userAuth.isAuthenticated, eventQueue]);
+
   const value: NostrContextType = {
     // Pool and general Nostr connection state
     ...connectionState,
@@ -76,10 +98,14 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     // Bunker authentication state
     ...bunkerAuth,
 
+    // Event queue state
+    ...eventQueue,
+
     // Callbacks
     logout,
     sendVerifiedEvent,
     sendEvent,
+    submitEvent,
   };
 
   return (

@@ -6,6 +6,7 @@ import { generateSecretKey } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import type { OpenBunkerResponse } from '../api/openbunker';
 import { RequestForm } from '../components/RequestForm';
+import { EventQueueHeader } from '../components/EventQueueHeader';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -14,10 +15,14 @@ const RequestPage: React.FC = () => {
     userProfile,
     userPublicKey,
     bunkerSigner,
-    sendEvent,
+    submitEvent,
     handleBunkerConnectionToken,
     bunkerStatus,
     bunkerError,
+    queue,
+    isProcessing,
+    removeFromQueue,
+    clearQueue,
   } = useNostr();
 
   const { submitUnauthenticatedRequest, isSubmitting, error } =
@@ -118,7 +123,8 @@ const RequestPage: React.FC = () => {
         created_at: Math.floor(Date.now() / 1000),
       });
 
-      await sendEvent(requestEvent);
+      // Use submitEvent instead of sendEvent to add to queue
+      submitEvent(requestEvent);
 
       navigate('/dashboard', {
         state: {
@@ -264,6 +270,14 @@ const RequestPage: React.FC = () => {
             Tell us about your community request
           </p>
 
+          {/* Event Queue Header */}
+          <EventQueueHeader
+            queue={queue}
+            isProcessing={isProcessing}
+            onRemoveFromQueue={removeFromQueue}
+            onClearQueue={clearQueue}
+          />
+
           {/* Connection Status Section */}
           <div className="max-w-md mx-auto mb-8">
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -332,7 +346,7 @@ const RequestPage: React.FC = () => {
                             ? 'text-green-700'
                             : bunkerStatus === 'connecting'
                               ? 'text-yellow-700'
-                              : 'text-red-700'
+                              : 'bg-red-700'
                         }`}
                       >
                         {bunkerStatus === 'connected'
