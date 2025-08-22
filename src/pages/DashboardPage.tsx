@@ -65,10 +65,10 @@ export const DashboardPage: React.FC = () => {
 
               <div className="text-center space-y-3">
                 <button
-                  onClick={() => navigate('/new-request')}
+                  onClick={() => navigate('/request')}
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
                 >
-                  Create New Request
+                  Submit Request
                 </button>
                 <button
                   onClick={() => {
@@ -93,10 +93,10 @@ export const DashboardPage: React.FC = () => {
               <div className="bg-white rounded-lg p-6 shadow-lg">
                 <div className="space-y-4">
                   <button
-                    onClick={() => navigate('/new-request')}
+                    onClick={() => navigate('/request')}
                     className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
                   >
-                    Submit New Request
+                    Submit Request
                   </button>
                   <button
                     onClick={() => navigate('/requests')}

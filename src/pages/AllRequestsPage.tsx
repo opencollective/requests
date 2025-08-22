@@ -6,21 +6,19 @@ import { RequestCard } from '../components/RequestCard';
 
 export const AllRequestsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConfigured } = useNostr();
+  const { isConnected } = useNostr();
   const { requests, isLoading, error, refreshRequests } = useRequests();
-
-  // Redirect to login if not configured
-  useEffect(() => {
-    if (!isConfigured) {
-      navigate('/login');
-    }
-  }, [isConfigured, navigate]);
 
   const handleViewDetails = (requestId: string) => {
     navigate(`/requests/${requestId}`);
   };
+  useEffect(() => {
+    if (isConnected) {
+      refreshRequests();
+    }
+  }, [isConnected, refreshRequests]);
 
-  if (!isConfigured) {
+  if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
         <div className="text-center">
@@ -54,7 +52,7 @@ export const AllRequestsPage: React.FC = () => {
                 ← Back to Dashboard
               </button>
               <button
-                onClick={() => navigate('/new-request')}
+                onClick={() => navigate('/request')}
                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
                 + New Request
@@ -130,7 +128,7 @@ export const AllRequestsPage: React.FC = () => {
                 Be the first to submit a community request!
               </p>
               <button
-                onClick={() => navigate('/new-request')}
+                onClick={() => navigate('/request')}
                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
                 Submit First Request

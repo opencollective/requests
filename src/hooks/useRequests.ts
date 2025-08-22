@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNostr } from './useNostr';
+import type { Event } from 'nostr-tools';
 
 export interface RequestData {
   id: string;
@@ -13,34 +14,70 @@ export interface RequestData {
 }
 
 export function useRequests() {
-  const { isConnected, subscribeToEvents, events, clearEvents } = useNostr();
+  const { isConnected, pool, relays } = useNostr();
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const subscriptionRef = useRef<{ close: () => void } | null>(null);
 
   const fetchRequests = useCallback(() => {
-    if (!isConnected) return;
+    if (!isConnected || !pool || !relays) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
+      // Clear any existing subscription
+      if (subscriptionRef.current) {
+        subscriptionRef.current.close();
+        subscriptionRef.current = null;
+      }
+
       // Subscribe to all community request events (kind 30023 with topic tag)
-      subscribeToEvents({
-        kinds: [30023],
-        '#t': ['community-request'],
-        limit: 100,
-      });
-    } catch {
+      const unsubscribe = pool.subscribe(
+        relays,
+        {
+          kinds: [30023],
+          '#t': ['community-request'],
+          limit: 100,
+        },
+        {
+          onevent(event) {
+            console.log('Received community request event:', event);
+            setEvents(prevEvents => {
+              // Avoid duplicates by checking if event already exists
+              const exists = prevEvents.some(e => e.id === event.id);
+              if (!exists) {
+                return [...prevEvents, event];
+              }
+              return prevEvents;
+            });
+          },
+          oneose() {
+            console.log('Community requests subscription ended');
+            setIsLoading(false);
+          },
+        }
+      );
+
+      subscriptionRef.current = unsubscribe;
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
       setError('Failed to fetch requests');
       setIsLoading(false);
     }
-  }, [isConnected, subscribeToEvents]);
+  }, [isConnected, pool, relays]);
 
   const refreshRequests = useCallback(() => {
-    clearEvents();
+    // Clear existing events and subscription
+    setEvents([]);
+    if (subscriptionRef.current) {
+      subscriptionRef.current.close();
+      subscriptionRef.current = null;
+    }
     fetchRequests();
-  }, [clearEvents, fetchRequests]);
+  }, [fetchRequests]);
 
   // Process events into request data
   useEffect(() => {
@@ -71,7 +108,6 @@ export function useRequests() {
       .sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
 
     setRequests(processedRequests);
-    setIsLoading(false);
   }, [events]);
 
   // Auto-fetch when connected
@@ -80,6 +116,15 @@ export function useRequests() {
       fetchRequests();
     }
   }, [isConnected, fetchRequests]);
+
+  // Cleanup subscription on unmount
+  useEffect(() => {
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.close();
+      }
+    };
+  }, []);
 
   return {
     requests,

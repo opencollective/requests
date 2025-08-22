@@ -26,13 +26,6 @@ export const LoginOptions: React.FC = () => {
 
   // Set up the callback function for the popup
   useEffect(() => {
-    // Define the callback function on the window object (kept for backward compatibility)
-    (
-      window as { openBunkerCallback?: (secretKey: string) => void }
-    ).openBunkerCallback = (secretKey: string) => {
-      handleOpenBunkerSuccess(secretKey);
-    };
-
     // Set up message listener for cross-origin communication
     const handleMessage = (event: MessageEvent) => {
       // Handle messages from OpenBunker popup (cross-origin)
@@ -46,8 +39,6 @@ export const LoginOptions: React.FC = () => {
 
     return () => {
       // Clean up
-      delete (window as { openBunkerCallback?: (secretKey: string) => void })
-        .openBunkerCallback;
       window.removeEventListener('message', handleMessage);
     };
   }, [handleOpenBunkerSuccess]);
@@ -181,6 +172,20 @@ export const LoginOptions: React.FC = () => {
         <p className="text-sm text-gray-500 mt-1">
           <strong>OpenBunker:</strong> Use Discord OAuth to get a new Nostr key
         </p>
+      </div>
+
+      <div className="border-t pt-6">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 mb-3">
+            Don't want to authenticate right now?
+          </p>
+          <button
+            onClick={() => navigate('/request')}
+            className="text-blue-600 hover:text-blue-700 underline text-sm font-medium"
+          >
+            Submit a request without authentication
+          </button>
+        </div>
       </div>
     </div>
   );
