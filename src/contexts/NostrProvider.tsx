@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
-import type { Event } from 'nostr-tools';
+import { finalizeEvent, type Event, type UnsignedEvent } from 'nostr-tools';
 import type { NostrContextType } from './NostrContextTypes';
-import { NostrContext } from './NostrContext';
 import {
   useNostrConnectionState,
   useSecretKeyAuthState,
@@ -9,6 +8,7 @@ import {
   useUserAuthenticationState,
 } from '../hooks/useNostrStates';
 import { useEventQueue } from '../hooks/useEventQueue';
+import { NostrContext } from './NostrContext';
 
 export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Use custom hooks for different state management
@@ -35,41 +35,32 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
   // Sign and send event (placeholder - implement based on your needs)
   const signAndSendEvent = useCallback(
-    async (event: Event) => {
-      // Check if the event needs to be signed (has no signature or empty signature)
-      if (!event.sig || event.sig === '') {
-        // Event needs to be signed first
-        if (secretKeyAuth.localSecretKey) {
-          // Sign with local secret key using nostr-tools
-          const { finalizeEvent } = await import('nostr-tools');
-
-          const signedEvent = finalizeEvent(
-            {
-              kind: event.kind,
-              content: event.content,
-              tags: event.tags,
-              created_at: event.created_at,
-            },
-            secretKeyAuth.localSecretKey
-          );
-
-          return sendVerifiedEvent(signedEvent);
-        } else if (bunkerAuth.bunkerSigner) {
-          // Sign with bunker signer
-          const signedEvent = await bunkerAuth.bunkerSigner.signEvent({
+    async (event: UnsignedEvent) => {
+      // Event needs to be signed first
+      if (secretKeyAuth.localSecretKey) {
+        const signedEvent = finalizeEvent(
+          {
             kind: event.kind,
             content: event.content,
             tags: event.tags,
             created_at: event.created_at,
-          });
+          },
+          secretKeyAuth.localSecretKey
+        );
 
-          return sendVerifiedEvent(signedEvent);
-        } else {
-          throw new Error('No signing method available');
-        }
+        return sendVerifiedEvent(signedEvent);
+      } else if (bunkerAuth.bunkerSigner) {
+        // Sign with bunker signer
+        const signedEvent = await bunkerAuth.bunkerSigner.signEvent({
+          kind: event.kind,
+          content: event.content,
+          tags: event.tags,
+          created_at: event.created_at,
+        });
+
+        return sendVerifiedEvent(signedEvent);
       } else {
-        // Event is already signed, just send it
-        return sendVerifiedEvent(event);
+        throw new Error('No signing method available');
       }
     },
     [secretKeyAuth.localSecretKey, bunkerAuth.bunkerSigner, sendVerifiedEvent]
@@ -84,7 +75,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Initialize event queue with the sendEvent function
-  const eventQueue = useEventQueue(sendEvent);
+  const eventQueue = useEventQueue(signAndSendEvent);
 
   // Logout function that clears all states
   const logout = useCallback(async () => {
@@ -97,7 +88,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
   // New submitEvent function that adds events to the queue
   const submitEvent = useCallback(
-    (event: Event) => {
+    (event: UnsignedEvent) => {
       eventQueue.addToQueue(event);
       console.log('Event added to queue:', event);
     },

@@ -1,19 +1,20 @@
 import { useState, useCallback } from 'react';
-import type { Event as NostrEvent } from 'nostr-tools';
+import type { UnsignedEvent } from 'nostr-tools';
 import type {
   EventQueueItem,
   EventQueueState,
 } from '../contexts/NostrContextTypes';
 
 export function useEventQueue(
-  sendEvent?: (event: NostrEvent) => Promise<void>
+  sendEvent?: (event: UnsignedEvent) => Promise<void>
 ): EventQueueState {
   const [queue, setQueue] = useState<EventQueueItem[]>([]);
+  const [processedQueue, setProcessedQueue] = useState<EventQueueItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const addToQueue = useCallback((event: NostrEvent) => {
+  const addToQueue = useCallback((event: UnsignedEvent) => {
     const queueItem: EventQueueItem = {
-      id: `${event.id || Date.now()}-${Math.random()}`,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       event,
       timestamp: Date.now(),
       status: 'pending',
@@ -51,12 +52,17 @@ export function useEventQueue(
           // Actually send the event
           await sendEvent(item.event);
 
-          // Mark as completed
+          // Mark as completed and move to processed queue
+          const completedItem = { ...item, status: 'completed' as const };
+
           setQueue(prevQueue =>
-            prevQueue.map(qItem =>
-              qItem.id === item.id ? { ...qItem, status: 'completed' } : qItem
-            )
+            prevQueue.filter(qItem => qItem.id !== item.id)
           );
+
+          setProcessedQueue(prevProcessedQueue => [
+            ...prevProcessedQueue,
+            completedItem,
+          ]);
         } catch (error) {
           // Mark as failed
           setQueue(prevQueue =>
@@ -80,6 +86,7 @@ export function useEventQueue(
 
   return {
     queue,
+    processedQueue,
     isProcessing,
     addToQueue,
     removeFromQueue,

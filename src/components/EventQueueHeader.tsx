@@ -3,6 +3,7 @@ import type { EventQueueItem } from '../contexts/NostrContextTypes';
 
 interface EventQueueHeaderProps {
   queue: EventQueueItem[];
+  processedQueue: EventQueueItem[];
   isProcessing: boolean;
   onRemoveFromQueue: (id: string) => void;
   onClearQueue: () => void;
@@ -10,13 +11,14 @@ interface EventQueueHeaderProps {
 
 export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
   queue,
+  processedQueue,
   isProcessing,
   onRemoveFromQueue,
   onClearQueue,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  if (queue.length === 0) {
+  if (queue.length === 0 && processedQueue.length === 0) {
     return null;
   }
 
@@ -24,7 +26,7 @@ export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
   const processingCount = queue.filter(
     item => item.status === 'processing'
   ).length;
-  const completedCount = queue.filter(
+  const completedCount = processedQueue.filter(
     item => item.status === 'completed'
   ).length;
   const failedCount = queue.filter(item => item.status === 'failed').length;
@@ -165,7 +167,7 @@ export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
                               0,
                               100
                             ) + '...'
-                        : `Event ${item.event.id?.substring(0, 8)}...`}
+                        : `Event ${item.id.substring(0, 8)}...`}
                     </div>
                     {item.error && (
                       <div className="text-xs text-red-600 mt-1">
@@ -191,9 +193,17 @@ export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
           {queue.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="text-sm text-gray-600">
-                Total events: {queue.length} | Pending: {pendingCount} |
-                Processing: {processingCount} | Completed: {completedCount} |
-                Failed: {failedCount}
+                Active events: {queue.length} | Pending: {pendingCount} |
+                Processing: {processingCount} | Failed: {failedCount}
+              </div>
+            </div>
+          )}
+
+          {processedQueue.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="text-sm text-gray-600">
+                Processed events: {processedQueue.length} | Completed:{' '}
+                {completedCount}
               </div>
             </div>
           )}

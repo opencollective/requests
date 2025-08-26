@@ -15,6 +15,7 @@ export const DashboardPage: React.FC = () => {
     isAuthenticated,
     logout,
     queue,
+    processedQueue,
     isProcessing,
     removeFromQueue,
     clearQueue,
@@ -38,6 +39,7 @@ export const DashboardPage: React.FC = () => {
         {/* Event Queue Header */}
         <EventQueueHeader
           queue={queue}
+          processedQueue={processedQueue}
           isProcessing={isProcessing}
           onRemoveFromQueue={removeFromQueue}
           onClearQueue={clearQueue}

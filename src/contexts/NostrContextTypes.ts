@@ -1,10 +1,16 @@
-import type { Event, Filter, SimplePool, VerifiedEvent } from 'nostr-tools';
+import type {
+  Event,
+  Filter,
+  SimplePool,
+  UnsignedEvent,
+  VerifiedEvent,
+} from 'nostr-tools';
 import type { BunkerSigner } from 'nostr-tools/nip46';
 
 // Event queue item for pending events
 export interface EventQueueItem {
   id: string;
-  event: Event;
+  event: UnsignedEvent;
   timestamp: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
@@ -13,8 +19,9 @@ export interface EventQueueItem {
 // Event queue state
 export interface EventQueueState {
   queue: EventQueueItem[];
+  processedQueue: EventQueueItem[];
   isProcessing: boolean;
-  addToQueue: (event: Event) => void;
+  addToQueue: (event: UnsignedEvent) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
   processQueue: () => Promise<void>;
@@ -69,7 +76,7 @@ export interface AuthenticatedCallbacks {
   logout: () => Promise<void>;
   sendVerifiedEvent: (event: VerifiedEvent) => Promise<void>;
   sendEvent: (event: Event) => Promise<void>;
-  submitEvent: (event: Event) => void; // New method for queue-based submission
+  submitEvent: (event: UnsignedEvent) => void; // New method for queue-based submission
 }
 
 export interface NostrContextType

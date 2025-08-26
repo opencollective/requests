@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { useNostr } from '../hooks/useNostr';
-import type { Event } from 'nostr-tools';
-
+import { type UnsignedEvent } from 'nostr-tools';
 interface ReplyFormProps {
   requestId: string;
-  onReplyAdded: (newEvent?: Event) => void;
+  onReplyAdded: (newEvent?: UnsignedEvent) => void;
 }
 
 export const ReplyForm: React.FC<ReplyFormProps> = ({
   requestId,
   onReplyAdded,
 }) => {
-  const { isAuthenticated, userPublicKey, submitEvent, bunkerSigner } =
-    useNostr();
+  const { isAuthenticated, userPublicKey, submitEvent } = useNostr();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +23,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
       return;
     }
 
-    if (!isAuthenticated || !userPublicKey || !bunkerSigner) {
+    if (!isAuthenticated || !userPublicKey) {
       setError('You must be authenticated to reply');
       return;
     }
@@ -35,7 +33,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
 
     try {
       // Create and sign a reply event (kind 1 - text note)
-      const replyEvent = await bunkerSigner.signEvent({
+      const replyEvent = {
         kind: 1,
         content: message,
         tags: [
@@ -43,7 +41,8 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           ['p', userPublicKey], // Reference to the author
         ],
         created_at: Math.floor(Date.now() / 1000),
-      });
+        pubkey: userPublicKey,
+      };
 
       // Use submitEvent to add to queue instead of sending immediately
       submitEvent(replyEvent);
@@ -57,39 +56,6 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
       setIsSubmitting(false);
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-        <p className="text-gray-600 mb-3">
-          You must be logged in to reply to this request.
-        </p>
-        <button
-          onClick={() => (window.location.href = '/login')}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Log In
-        </button>
-      </div>
-    );
-  }
-
-  if (!bunkerSigner) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-        <p className="text-gray-600 mb-3">
-          Bunker connection is required to reply to requests. Please reconnect
-          your bunker.
-        </p>
-        <button
-          onClick={() => (window.location.href = '/login')}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Reconnect
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
