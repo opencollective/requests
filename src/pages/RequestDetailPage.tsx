@@ -18,7 +18,6 @@ export const RequestDetailPage: React.FC = () => {
   const [thread, setThread] = useState<ThreadEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [localEvents, setLocalEvents] = useState<Event[]>([]); // Local events added immediately
 
   // Redirect to login if not configured
   useEffect(() => {
@@ -34,7 +33,6 @@ export const RequestDetailPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     clearEvents();
-    setLocalEvents([]); // Clear local events when fetching new data
 
     try {
       // First, fetch the main request
@@ -64,9 +62,7 @@ export const RequestDetailPage: React.FC = () => {
 
   // Process events into request and thread
   useEffect(() => {
-    // Combine global events with local events, removing duplicates
-    const allEvents = [...events, ...localEvents];
-    const uniqueEvents = allEvents.filter(
+    const uniqueEvents = events.filter(
       (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
     );
 
@@ -95,7 +91,8 @@ export const RequestDetailPage: React.FC = () => {
       event =>
         event.id !== requestId &&
         event.kind === 1 && // Text notes (replies)
-        event.tags.some(tag => tag[0] === 'e' && tag[1] === requestId)
+        event.tags.some(tag => tag[0] === 'e' && tag[1] === requestId) &&
+        !threadEvents.some(threadEvent => threadEvent.id === event.id)
     );
 
     // Sort replies by timestamp
@@ -128,7 +125,7 @@ export const RequestDetailPage: React.FC = () => {
 
     setThread(threadEvents);
     setIsLoading(false);
-  }, [events, localEvents, requestId]);
+  }, [events, requestId]);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -323,16 +320,7 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Reply Form */}
-          <ReplyForm
-            requestId={requestId!}
-            onReplyAdded={newEvent => {
-              if (newEvent) {
-                // Add the new event to local events immediately for instant UI update
-                setLocalEvents(prev => [...prev, newEvent]);
-              }
-              // The event will also be picked up by the subscription eventually
-            }}
-          />
+          <ReplyForm requestId={requestId!} onReplyAdded={() => {}} />
         </div>
       </div>
     </div>

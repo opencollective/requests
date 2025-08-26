@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { AllRequestsPage } from './pages/AllRequestsPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import RequestPage from './pages/RequestPage';
+import QueueItemPage from './pages/QueueItemPage';
 import './index.css';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
               path="/requests/:requestId"
               element={<RequestDetailPage />}
             />
+            <Route path="/queue/:queueItemId" element={<QueueItemPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

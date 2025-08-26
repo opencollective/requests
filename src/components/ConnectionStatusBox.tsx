@@ -1,29 +1,31 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useNostr } from '../hooks/useNostr';
 
 interface ConnectionStatusBoxProps {
-  isConnected: boolean;
-  userPublicKey?: string | null;
-  bunkerStatus?: string | null;
-  bunkerPublicKey?: string | null;
-  localSecretKey?: Uint8Array | null;
-  isAuthenticated?: boolean;
   onLogout?: () => void;
   showLoginButton?: boolean;
 }
 
 export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
-  isConnected,
-  userPublicKey,
-  bunkerStatus,
-  bunkerPublicKey,
-  localSecretKey,
-  isAuthenticated,
   onLogout,
   showLoginButton = false,
 }) => {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get all the state from the Nostr context
+  const {
+    isConnected,
+    userPublicKey,
+    bunkerStatus,
+    bunkerPublicKey,
+    localSecretKey,
+    isAuthenticated,
+    isSubmitting: isOpenBunkerSubmitting,
+    error: openBunkerError,
+    lastResponse: lastOpenBunkerResponse,
+  } = useNostr();
 
   // Determine authentication method and status
   const hasBunkerData = bunkerPublicKey;
@@ -237,6 +239,49 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
               <p className="text-xs text-gray-500 mt-2 text-center">
                 Or submit anonymously below
               </p>
+            </div>
+          )}
+
+          {/* OpenBunker State Information */}
+          {(isOpenBunkerSubmitting ||
+            openBunkerError ||
+            lastOpenBunkerResponse) && (
+            <div className="pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                OpenBunker Status
+              </h3>
+
+              {isOpenBunkerSubmitting && (
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-gray-600">
+                    Submitting to OpenBunker...
+                  </span>
+                </div>
+              )}
+
+              {openBunkerError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3">
+                  <p className="text-sm text-red-700">
+                    <span className="font-medium">OpenBunker Error:</span>{' '}
+                    {openBunkerError}
+                  </p>
+                </div>
+              )}
+
+              {lastOpenBunkerResponse && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Last Response:</span>{' '}
+                    {lastOpenBunkerResponse.message || 'Request submitted'}
+                  </p>
+                  {lastOpenBunkerResponse.bunkerUrl && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Bunker URL: {lastOpenBunkerResponse.bunkerUrl}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

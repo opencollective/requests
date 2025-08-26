@@ -1,15 +1,18 @@
 import { useState, useCallback } from 'react';
-import type { UnsignedEvent } from 'nostr-tools';
+import type { Event, UnsignedEvent } from 'nostr-tools';
 import type {
   EventQueueItem,
   EventQueueState,
+  ProcessedEventQueueItem,
 } from '../contexts/NostrContextTypes';
 
 export function useEventQueue(
-  sendEvent?: (event: UnsignedEvent) => Promise<void>
+  sendEvent?: (event: UnsignedEvent) => Promise<Event>
 ): EventQueueState {
   const [queue, setQueue] = useState<EventQueueItem[]>([]);
-  const [processedQueue, setProcessedQueue] = useState<EventQueueItem[]>([]);
+  const [processedQueue, setProcessedQueue] = useState<
+    ProcessedEventQueueItem[]
+  >([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const addToQueue = useCallback((event: UnsignedEvent) => {
@@ -21,6 +24,7 @@ export function useEventQueue(
     };
 
     setQueue(prevQueue => [...prevQueue, queueItem]);
+    return queueItem.id;
   }, []);
 
   const removeFromQueue = useCallback((id: string) => {
@@ -30,6 +34,15 @@ export function useEventQueue(
   const clearQueue = useCallback(() => {
     setQueue(prevQueue => prevQueue.filter(item => item.status === 'pending'));
   }, []);
+
+  const getQueueItemById = useCallback(
+    (id: string) => {
+      const activeItem = queue.find(item => item.id === id);
+      const processedItem = processedQueue.find(item => item.id === id);
+      return activeItem || processedItem;
+    },
+    [queue, processedQueue]
+  );
 
   const processQueue = useCallback(async () => {
     if (isProcessing || queue.length === 0 || !sendEvent) return;
@@ -50,10 +63,14 @@ export function useEventQueue(
 
         try {
           // Actually send the event
-          await sendEvent(item.event);
+          const event = await sendEvent(item.event);
 
           // Mark as completed and move to processed queue
-          const completedItem = { ...item, status: 'completed' as const };
+          const completedItem = {
+            ...item,
+            status: 'completed' as const,
+            event,
+          };
 
           setQueue(prevQueue =>
             prevQueue.filter(qItem => qItem.id !== item.id)
@@ -91,6 +108,7 @@ export function useEventQueue(
     addToQueue,
     removeFromQueue,
     clearQueue,
+    getQueueItemById,
     processQueue,
   };
 }

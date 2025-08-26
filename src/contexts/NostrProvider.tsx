@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { finalizeEvent, type Event, type UnsignedEvent } from 'nostr-tools';
 import type { NostrContextType } from './NostrContextTypes';
 import {
@@ -8,6 +8,7 @@ import {
   useUserAuthenticationState,
 } from '../hooks/useNostrStates';
 import { useEventQueue } from '../hooks/useEventQueue';
+import { useOpenbunkerState } from '../hooks/useOpenbunkerState';
 import { NostrContext } from './NostrContext';
 
 export function NostrProvider({ children }: { children: React.ReactNode }) {
@@ -17,10 +18,22 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const bunkerAuth = useBunkerAuthState();
   const userAuth = useUserAuthenticationState(secretKeyAuth, bunkerAuth);
 
+  const hasSigningMethod = useMemo(
+    () => !!secretKeyAuth.localSecretKey || !!bunkerAuth.bunkerSigner,
+    [secretKeyAuth.localSecretKey, bunkerAuth.bunkerSigner]
+  );
+  // Initialize OpenBunker state
+  const openBunkerState = useOpenbunkerState(
+    hasSigningMethod,
+    bunkerAuth.handleBunkerConnectionToken
+  );
+
   // Send event (requires authentication)
   const sendVerifiedEvent = useCallback(
     async (event: Event) => {
-      if (!connectionState.pool) return;
+      if (!connectionState.pool) {
+        throw new Error('No pool available');
+      }
 
       try {
         await connectionState.pool.publish(connectionState.relays, event);
@@ -29,6 +42,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         console.error('Failed to publish event:', err);
         // Note: Error handling is now managed in the secret key auth state
       }
+      return event;
     },
     [connectionState.pool, connectionState.relays]
   );
@@ -66,16 +80,16 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     [secretKeyAuth.localSecretKey, bunkerAuth.bunkerSigner, sendVerifiedEvent]
   );
 
+  // Initialize event queue with the sendEvent function
+  const eventQueue = useEventQueue(signAndSendEvent);
+
   // Simple sendEvent function for compatibility with existing components
   const sendEvent = useCallback(
     async (event: Event) => {
-      return signAndSendEvent(event);
+      return await signAndSendEvent(event);
     },
     [signAndSendEvent]
   );
-
-  // Initialize event queue with the sendEvent function
-  const eventQueue = useEventQueue(signAndSendEvent);
 
   // Logout function that clears all states
   const logout = useCallback(async () => {
@@ -84,13 +98,15 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       bunkerAuth.bunkerLogout(),
     ]);
     eventQueue.clearQueue();
-  }, [secretKeyAuth, bunkerAuth, eventQueue]);
+    openBunkerState.clearResponse();
+  }, [secretKeyAuth, bunkerAuth, eventQueue, openBunkerState]);
 
   // New submitEvent function that adds events to the queue
   const submitEvent = useCallback(
     (event: UnsignedEvent) => {
-      eventQueue.addToQueue(event);
-      console.log('Event added to queue:', event);
+      const queueItemId = eventQueue.addToQueue(event);
+      console.log('Event added to queue:', event, 'with ID:', queueItemId);
+      return queueItemId;
     },
     [eventQueue]
   );
@@ -99,14 +115,14 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (userAuth.isAuthenticated && eventQueue.queue.length > 0) {
       // Only process events if we have a signing method available
-      const hasSigningMethod =
-        secretKeyAuth.localSecretKey || bunkerAuth.bunkerSigner;
+
       if (hasSigningMethod) {
         // Try to process any pending events in the queue
         eventQueue.processQueue();
       }
     }
   }, [
+    hasSigningMethod,
     userAuth.isAuthenticated,
     eventQueue,
     secretKeyAuth.localSecretKey,
@@ -128,6 +144,9 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
     // Event queue state
     ...eventQueue,
+
+    // OpenBunker state
+    ...openBunkerState,
 
     // Callbacks
     logout,

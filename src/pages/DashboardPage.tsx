@@ -6,20 +6,7 @@ import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    isConnected,
-    userPublicKey,
-    bunkerStatus,
-    bunkerPublicKey,
-    localSecretKey,
-    isAuthenticated,
-    logout,
-    queue,
-    processedQueue,
-    isProcessing,
-    removeFromQueue,
-    clearQueue,
-  } = useNostr();
+  const { logout } = useNostr();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -37,24 +24,12 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Event Queue Header */}
-        <EventQueueHeader
-          queue={queue}
-          processedQueue={processedQueue}
-          isProcessing={isProcessing}
-          onRemoveFromQueue={removeFromQueue}
-          onClearQueue={clearQueue}
-        />
+        <EventQueueHeader />
 
         <div className="max-w-6xl mx-auto">
           {/* Connection Status Section - Top Priority */}
           <div className="mb-8">
             <ConnectionStatusBox
-              isConnected={isConnected}
-              userPublicKey={userPublicKey}
-              bunkerStatus={bunkerStatus}
-              bunkerPublicKey={bunkerPublicKey}
-              localSecretKey={localSecretKey}
-              isAuthenticated={isAuthenticated}
               onLogout={async () => {
                 await logout();
                 navigate('/login');

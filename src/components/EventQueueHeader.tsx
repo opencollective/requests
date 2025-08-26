@@ -1,22 +1,13 @@
 import React, { useState } from 'react';
 import type { EventQueueItem } from '../contexts/NostrContextTypes';
+import { useNostr } from '../hooks/useNostr';
 
-interface EventQueueHeaderProps {
-  queue: EventQueueItem[];
-  processedQueue: EventQueueItem[];
-  isProcessing: boolean;
-  onRemoveFromQueue: (id: string) => void;
-  onClearQueue: () => void;
-}
-
-export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
-  queue,
-  processedQueue,
-  isProcessing,
-  onRemoveFromQueue,
-  onClearQueue,
-}) => {
+export const EventQueueHeader: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get all the queue state from the Nostr context
+  const { queue, processedQueue, isProcessing, removeFromQueue, clearQueue } =
+    useNostr();
 
   if (queue.length === 0 && processedQueue.length === 0) {
     return null;
@@ -63,7 +54,7 @@ export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
 
   const handleClearQueue = () => {
     // Only clear completed and failed items, keep pending ones
-    onClearQueue();
+    clearQueue();
   };
 
   return (
@@ -179,7 +170,7 @@ export const EventQueueHeader: React.FC<EventQueueHeaderProps> = ({
 
                 {item.status === 'pending' && (
                   <button
-                    onClick={() => onRemoveFromQueue(item.id)}
+                    onClick={() => removeFromQueue(item.id)}
                     className="text-red-500 hover:text-red-700 transition-colors p-1"
                     title="Remove from queue"
                   >

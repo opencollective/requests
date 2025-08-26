@@ -6,6 +6,8 @@ import type {
   VerifiedEvent,
 } from 'nostr-tools';
 import type { BunkerSigner } from 'nostr-tools/nip46';
+import type { OpenBunkerResponse } from '../api/openbunker';
+import type { RequestFormData } from '../types/RequestFormSchema';
 
 // Event queue item for pending events
 export interface EventQueueItem {
@@ -16,15 +18,36 @@ export interface EventQueueItem {
   error?: string;
 }
 
+export interface ProcessedEventQueueItem {
+  id: string;
+  event: Event;
+  timestamp: number;
+  status: 'completed' | 'failed';
+  error?: string;
+}
+
 // Event queue state
 export interface EventQueueState {
   queue: EventQueueItem[];
-  processedQueue: EventQueueItem[];
+  processedQueue: ProcessedEventQueueItem[];
   isProcessing: boolean;
-  addToQueue: (event: UnsignedEvent) => void;
+  addToQueue: (event: UnsignedEvent) => string; // Returns the queue item ID
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
+  getQueueItemById: (
+    id: string
+  ) => EventQueueItem | ProcessedEventQueueItem | undefined;
   processQueue: () => Promise<void>;
+}
+
+// OpenBunker state for managing OpenBunker API interactions
+export interface OpenBunkerState {
+  isSubmitting: boolean;
+  error: string | null;
+  lastResponse: OpenBunkerResponse | null;
+  triggerOpenbunkerLogin: (data: RequestFormData) => Promise<void>;
+  clearError: () => void;
+  clearResponse: () => void;
 }
 
 // Pool and general Nostr connection state (no authentication required)
@@ -74,9 +97,9 @@ export interface BunkerAuthState {
 // Callbacks for authenticated operations
 export interface AuthenticatedCallbacks {
   logout: () => Promise<void>;
-  sendVerifiedEvent: (event: VerifiedEvent) => Promise<void>;
-  sendEvent: (event: Event) => Promise<void>;
-  submitEvent: (event: UnsignedEvent) => void; // New method for queue-based submission
+  sendVerifiedEvent: (event: VerifiedEvent) => Promise<Event>;
+  sendEvent: (event: Event) => Promise<Event>;
+  submitEvent: (event: UnsignedEvent) => string; // Returns the queue item ID
 }
 
 export interface NostrContextType
@@ -85,4 +108,5 @@ export interface NostrContextType
     SecretKeyAuthState,
     BunkerAuthState,
     EventQueueState,
+    OpenBunkerState,
     AuthenticatedCallbacks {}
