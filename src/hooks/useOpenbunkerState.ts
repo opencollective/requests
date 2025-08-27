@@ -38,6 +38,8 @@ export function useOpenbunkerState(
         const result = await openBunkerApi.submitRequest({
           name: data.name,
           email: data.email,
+          scope:
+            process.env.NEXT_PUBLIC_OPENBUNKER_SCOPE || 'community-requests',
           subject: data.subject,
           message: data.message,
           timestamp: new Date().toISOString(),

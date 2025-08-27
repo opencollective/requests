@@ -15,6 +15,7 @@ export const openBunkerApi = {
   async submitRequest(requestData: {
     name: string;
     email: string;
+    scope: string;
     subject: string;
     message: string;
     timestamp: string;
