@@ -4,6 +4,7 @@ import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
 import { EventQueueHeader } from '../components/EventQueueHeader';
+import { getCommunityATagFromEnv } from '../utils/communityUtils';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,9 +37,12 @@ const RequestPage: React.FC = () => {
   };
 
   const handleSubmission = async (data: RequestFormData) => {
-    // Always create and queue the event (will be processed later based on auth status)
+    // Get community a tag from environment variables
+    const communityATag = getCommunityATagFromEnv();
+
+    // Create NIP-72 kind 1111 event for community request
     const eventData = {
-      kind: 30023, // NIP-23: Long-form Content
+      kind: 1111, // NIP-72: Community Request
       content: JSON.stringify({
         subject: data.subject,
         message: data.message,
@@ -51,6 +55,8 @@ const RequestPage: React.FC = () => {
         ['d', `request-${Date.now()}`], // Unique identifier
         ['subject', data.subject],
         ['t', 'community-request'], // Topic tag
+        // Add community a tag if available
+        ...(communityATag ? [['a', communityATag]] : []),
       ],
       created_at: Math.floor(Date.now() / 1000),
       pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not

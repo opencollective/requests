@@ -11,6 +11,7 @@ export interface RequestData {
   createdAt: string;
   author: string;
   timestamp: number;
+  communityATag: string; // Added for NIP-72 compliance
 }
 
 export function useRequests() {
@@ -34,17 +35,17 @@ export function useRequests() {
         subscriptionRef.current = null;
       }
 
-      // Subscribe to all community request events (kind 30023 with topic tag)
+      // Subscribe to NIP-72 community request events (kind 1111 with topic tag)
       const unsubscribe = pool.subscribe(
         relays,
         {
-          kinds: [30023],
+          kinds: [1111], // NIP-72: Community Request
           '#t': ['community-request'],
           limit: 100,
         },
         {
           onevent(event) {
-            console.log('Received community request event:', event);
+            console.log('Received NIP-72 community request event:', event);
             setEvents(prevEvents => {
               // Avoid duplicates by checking if event already exists
               const exists = prevEvents.some(e => e.id === event.id);
@@ -55,7 +56,7 @@ export function useRequests() {
             });
           },
           oneose() {
-            console.log('Community requests subscription ended');
+            console.log('NIP-72 community requests subscription ended');
             setIsLoading(false);
           },
         }
@@ -84,10 +85,15 @@ export function useRequests() {
     if (events.length === 0) return;
 
     const processedRequests: RequestData[] = events
-      .filter(event => event.kind === 30023)
+      .filter(event => event.kind === 1111) // NIP-72: Community Request
       .map(event => {
         try {
           const content = JSON.parse(event.content);
+
+          // Extract community a tag if present (NIP-72)
+          const communityATag =
+            event.tags.find(tag => tag[0] === 'a')?.[1] || '';
+
           return {
             id: event.id,
             subject: content.subject || 'No subject',
@@ -99,6 +105,7 @@ export function useRequests() {
               new Date(event.created_at * 1000).toISOString(),
             author: event.pubkey,
             timestamp: event.created_at,
+            communityATag, // Add community a tag for NIP-72 compliance
           };
         } catch {
           return null;
