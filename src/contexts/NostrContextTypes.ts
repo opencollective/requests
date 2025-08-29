@@ -109,4 +109,7 @@ export interface NostrContextType
     BunkerAuthState,
     EventQueueState,
     OpenBunkerState,
-    AuthenticatedCallbacks {}
+    AuthenticatedCallbacks {
+  // Computed aggregated nostr status for display
+  nostrStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+}

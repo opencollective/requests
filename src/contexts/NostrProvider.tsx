@@ -129,6 +129,28 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     bunkerAuth.bunkerSigner,
   ]);
 
+  // Compute aggregated nostrStatus for display
+  const nostrStatus = useMemo(() => {
+    // If using bunker authentication, use bunker status
+    if (bunkerAuth.bunkerConnectionToken && bunkerAuth.localSecretKey) {
+      return bunkerAuth.bunkerStatus;
+    }
+
+    // If using local secret key authentication, check if we have a connection
+    if (secretKeyAuth.localSecretKey) {
+      return connectionState.isConnected ? 'connected' : 'disconnected';
+    }
+
+    // No authentication method configured
+    return 'disconnected';
+  }, [
+    bunkerAuth.bunkerConnectionToken,
+    bunkerAuth.localSecretKey,
+    bunkerAuth.bunkerStatus,
+    secretKeyAuth.localSecretKey,
+    connectionState.isConnected,
+  ]);
+
   const value: NostrContextType = {
     // Pool and general Nostr connection state
     ...connectionState,
@@ -147,6 +169,9 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
     // OpenBunker state
     ...openBunkerState,
+
+    // Computed nostrStatus for display
+    nostrStatus,
 
     // Callbacks
     logout,

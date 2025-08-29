@@ -4,7 +4,6 @@ import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
 import { EventQueueHeader } from '../components/EventQueueHeader';
-import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -100,11 +99,6 @@ const RequestPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* Connection Status Box at the bottom */}
-        <div className="max-w-2xl mx-auto mt-8">
-          <ConnectionStatusBox showLoginButton={true} />
-        </div>
       </div>
     </div>
   );

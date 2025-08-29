@@ -15,7 +15,9 @@ export const LoginOptions: React.FC = () => {
     async (bunkerConnectionToken: string) => {
       try {
         const sk = generateSecretKey();
-        await handleBunkerConnectionToken(bunkerConnectionToken, sk);
+        // The bunker handling will continue in the background after navigating to the dashboard
+        // no need to await
+        handleBunkerConnectionToken(bunkerConnectionToken, sk);
         navigate('/dashboard');
       } catch (err) {
         console.error('Failed to complete OpenBunker authentication:', err);
