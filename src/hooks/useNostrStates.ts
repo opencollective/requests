@@ -1,7 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { SimplePool, getPublicKey } from 'nostr-tools';
 import type { Event, Filter } from 'nostr-tools';
-import { BunkerSigner, parseBunkerInput } from 'nostr-tools/nip46';
+import {
+  BunkerSigner,
+  type BunkerPointer,
+  parseBunkerInput,
+} from 'nostr-tools/nip46';
 import localforage from 'localforage';
 import type {
   NostrConnectionState,
@@ -270,121 +274,177 @@ export function useSecretKeyAuthState(): SecretKeyAuthState & {
   };
 }
 
-export function useBunkerAuthState(): BunkerAuthState & {
-  setBunkerLocalSecretKey: (sk: Uint8Array) => void;
-} {
-  const [bunkerConnectionToken, setBunkerConnectionToken] = useState<
-    string | null
-  >(null);
+export type BunkerConnectionConfiguration = {
+  connectionToken: string;
+  localSecretKey: Uint8Array;
+  publicKey: string;
+  bunkerPointer: BunkerPointer;
+};
+
+export function useBunkerAuthState(): BunkerAuthState {
   const [bunkerStatus, setBunkerStatus] = useState<
     'disconnected' | 'connecting' | 'connected' | 'error'
   >('disconnected');
-  const [bunkerError, setBunkerError] = useState<string | null>(null);
+  const [bunkerError, setBunkerErrorState] = useState<string | null>(null);
   const [bunkerSigner, setBunkerSigner] = useState<BunkerSigner | null>(null);
-  const [bunkerLocalSecretKey, setBunkerLocalSecretKey] =
-    useState<Uint8Array | null>(null);
-  const [bunkerPublicKey, setBunkerPublicKey] = useState<string | null>(null);
+  const [bunkerConnectionConfiguration, setBunkerConnectionConfiguration] =
+    useState<BunkerConnectionConfiguration | null>(null);
+  const configureBunkerConnection = useCallback(
+    async (
+      bunkerConnectionToken: string,
+      localSecretKey: Uint8Array
+    ): Promise<BunkerConnectionConfiguration> => {
+      const bunkerPointer = await parseBunkerInput(bunkerConnectionToken);
+      if (!bunkerPointer) {
+        throw new Error('Invalid bunker input');
+      }
+      const bunkerConnectionConfiguration = {
+        connectionToken: bunkerConnectionToken,
+        localSecretKey: localSecretKey,
+        publicKey: bunkerPointer.pubkey,
+        bunkerPointer: bunkerPointer,
+      };
+      setBunkerConnectionConfiguration(bunkerConnectionConfiguration);
+      setBunkerStatus('connecting');
+      setBunkerErrorState(null);
+      return bunkerConnectionConfiguration;
+    },
+    []
+  );
+
+  const connected = useCallback(() => {
+    setBunkerStatus('connected');
+    setBunkerErrorState(null);
+  }, []);
+
+  const error = useCallback((error: string) => {
+    setBunkerStatus('error');
+    setBunkerErrorState(error);
+  }, []);
+
+  const disconnected = useCallback(() => {
+    setBunkerStatus('disconnected');
+    setBunkerErrorState(null);
+    setBunkerSigner(null);
+    setBunkerConnectionConfiguration(null);
+  }, []);
+
+  const connectToBunker = useCallback(
+    async (bunkerSigner: BunkerSigner, timeoutMs: number) => {
+      try {
+        console.log(
+          'Connecting to bunker: client-pubkey',
+          bunkerSigner.bp.pubkey,
+          'signer',
+          bunkerSigner.bp.pubkey
+        );
+
+        // Create a promise that rejects after timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Connection timeout')), timeoutMs);
+        });
+
+        // Race between connection and timeout
+        const connectPromise = bunkerSigner.connect();
+        await Promise.race([connectPromise, timeoutPromise]);
+        connected();
+      } catch (err) {
+        console.error('Failed to connect to bunker:', err);
+        error(
+          err instanceof Error ? err.message : 'Failed to connect to bunker'
+        );
+      }
+    },
+    [connected, error]
+  );
+
+  const connectToBunkerWithRetry = useCallback(
+    async (
+      bunkerConnectionConfiguration: BunkerConnectionConfiguration,
+      timeoutMs: number
+    ) => {
+      // Automatically attempt to reconnect when data is loaded from storage
+      try {
+        // Retry connection with timeout - up to 3 attempts
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const bunkerSigner = new BunkerSigner(
+              bunkerConnectionConfiguration.localSecretKey,
+              bunkerConnectionConfiguration.bunkerPointer
+            );
+            console.log(`Connection attempt ${attempt}/${maxRetries}`);
+            await connectToBunker(bunkerSigner, timeoutMs);
+            // If we get here, connection was successful
+            setBunkerSigner(bunkerSigner);
+            console.log('Bunker auto-reconnection successful');
+
+            return; // Exit the function successfully
+          } catch (err) {
+            lastError =
+              err instanceof Error
+                ? err
+                : new Error('Unknown connection error');
+            console.error(
+              `Bunker auto-reconnection attempt ${attempt} failed:`,
+              lastError.message
+            );
+
+            if (attempt < maxRetries) {
+              // Wait before retrying (exponential backoff)
+              const delayMs = Math.min(
+                1000 * Math.pow(2, attempt - 1),
+                timeoutMs
+              );
+              console.log(`Waiting ${delayMs}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+          }
+        }
+
+        // If we get here, all attempts failed
+        error(
+          `Failed to auto-reconnect to bunker after ${maxRetries} attempts. Last error: ${
+            lastError?.message || 'Unknown error'
+          }`
+        );
+      } catch (reconnectErr) {
+        console.error('Failed to auto-reconnect bunker:', reconnectErr);
+        error(
+          reconnectErr instanceof Error
+            ? reconnectErr.message
+            : 'Failed to auto-reconnect bunker'
+        );
+      }
+    },
+    [bunkerConnectionConfiguration, disconnected, error, connectToBunker]
+  );
 
   // Load bunker data from storage on mount
   useEffect(() => {
     const loadStoredBunkerData = async () => {
       try {
+        console.log('loadStoredBunkerData');
         const [token, secretKey, publicKey] = await Promise.all([
           storage.loadBunkerToken(),
           storage.loadBunkerLocalSecretKey(),
           storage.loadBunkerPublicKey(),
         ]);
-
-        if (token && secretKey) {
-          setBunkerConnectionToken(token);
-          setBunkerLocalSecretKey(secretKey);
-          if (publicKey) {
-            setBunkerPublicKey(publicKey);
-          }
-          console.log(
-            'Loaded bunker data from storage, attempting reconnection...'
+        if (token && secretKey && publicKey) {
+          const bunkerConnectionConfiguration = await configureBunkerConnection(
+            token,
+            secretKey
           );
-
-          // Automatically attempt to reconnect when data is loaded from storage
-          try {
-            setBunkerStatus('connecting');
-            setBunkerError(null);
-
-            const bunkerInput = await parseBunkerInput(token);
-            if (!bunkerInput) {
-              throw new Error('Invalid bunker input from storage');
-            }
-
-            let bunkerSigner = new BunkerSigner(secretKey, bunkerInput);
-
-            // Retry connection with timeout - up to 3 attempts
-            const maxRetries = 3;
-            const timeoutMs = 10000; // 10 seconds timeout
-            let lastError: Error | null = null;
-
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              try {
-                bunkerSigner = new BunkerSigner(secretKey, bunkerInput);
-                console.log(
-                  `Auto-reconnection attempt ${attempt}/${maxRetries}`
-                );
-
-                // Create a promise that rejects after timeout
-                const timeoutPromise = new Promise<never>((_, reject) => {
-                  setTimeout(
-                    () => reject(new Error('Connection timeout')),
-                    timeoutMs
-                  );
-                });
-
-                // Race between connection and timeout
-                await Promise.race([bunkerSigner.connect(), timeoutPromise]);
-
-                // If we get here, connection was successful
-                console.log('Bunker auto-reconnection successful');
-                setBunkerStatus('connected');
-                setBunkerSigner(bunkerSigner);
-                return; // Exit the function successfully
-              } catch (err) {
-                lastError =
-                  err instanceof Error
-                    ? err
-                    : new Error('Unknown connection error');
-                console.error(
-                  `Bunker auto-reconnection attempt ${attempt} failed:`,
-                  lastError.message
-                );
-
-                if (attempt < maxRetries) {
-                  // Wait before retrying (exponential backoff)
-                  const delayMs = Math.min(
-                    1000 * Math.pow(2, attempt - 1),
-                    5000
-                  );
-                  console.log(`Waiting ${delayMs}ms before retry...`);
-                  await new Promise(resolve => setTimeout(resolve, delayMs));
-                }
-              }
-            }
-
-            // If we get here, all attempts failed
-            console.error('All bunker auto-reconnection attempts failed');
-            setBunkerStatus('error');
-            setBunkerError(
-              `Failed to auto-reconnect to bunker after ${maxRetries} attempts. Last error: ${
-                lastError?.message || 'Unknown error'
-              }`
-            );
-          } catch (reconnectErr) {
-            console.error('Failed to auto-reconnect bunker:', reconnectErr);
-            setBunkerStatus('error');
-            setBunkerError(
-              reconnectErr instanceof Error
-                ? reconnectErr.message
-                : 'Failed to auto-reconnect bunker'
-            );
+          if (!bunkerConnectionConfiguration) {
+            console.warn('Bunker not configured');
+            disconnected();
+            return;
           }
+          await connectToBunkerWithRetry(bunkerConnectionConfiguration, 10000);
         }
+        console.log(token, secretKey, publicKey);
       } catch (error) {
         console.error('Failed to load bunker data from storage:', error);
       }
@@ -396,133 +456,51 @@ export function useBunkerAuthState(): BunkerAuthState & {
   const handleBunkerConnectionToken = useCallback(
     async (bunkerConnectionToken: string, localSecretKey: Uint8Array) => {
       try {
-        setBunkerStatus('connecting');
-        setBunkerError(null);
-        setBunkerConnectionToken(bunkerConnectionToken); // Store the token
-        setBunkerLocalSecretKey(localSecretKey); // Store the local secret key used with bunker
-
-        // Save to storage
-        await Promise.all([
-          storage.saveBunkerToken(bunkerConnectionToken),
-          storage.saveBunkerLocalSecretKey(localSecretKey),
-        ]);
-
-        console.log('Bunker connection token:', bunkerConnectionToken);
-
-        const bunkerInput = await parseBunkerInput(bunkerConnectionToken);
-        if (!bunkerInput) {
-          throw new Error('Invalid bunker input');
+        console.log('handleBunkerConnectionToken');
+        const bunkerConnectionConfiguration = await configureBunkerConnection(
+          bunkerConnectionToken,
+          localSecretKey
+        );
+        if (!bunkerConnectionConfiguration) {
+          disconnected();
+          console.warn('Bunker not configured');
+          return;
         }
 
-        const bunkerPubkey = bunkerInput.pubkey;
-        const bunkerRelays = bunkerInput.relays;
-        console.log('Bunker pubkey:', bunkerPubkey);
-        console.log('Bunker relays:', bunkerRelays);
-
-        // Store the bunker public key
-        setBunkerPublicKey(bunkerPubkey);
-        // Save to storage
-        await storage.saveBunkerPublicKey(bunkerPubkey);
-
-        let bunkerSigner = new BunkerSigner(localSecretKey, bunkerInput);
-
-        // Retry connection with timeout - up to 3 attempts
-        const maxRetries = 3;
-        const timeoutMs = 10000; // 10 seconds timeout
-        let lastError: Error | null = null;
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            bunkerSigner = new BunkerSigner(localSecretKey, bunkerInput);
-            console.log(
-              `Attempting bunker connection (attempt ${attempt}/${maxRetries})`
-            );
-
-            // Create a promise that rejects after timeout
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(
-                () => reject(new Error('Connection timeout')),
-                timeoutMs
-              );
-            });
-
-            // Race between connection and timeout
-            await Promise.race([bunkerSigner.connect(), timeoutPromise]);
-
-            // If we get here, connection was successful
-            console.log('Bunker connected successfully');
-            setBunkerStatus('connected');
-            setBunkerSigner(bunkerSigner);
-            return; // Exit the function successfully
-          } catch (err) {
-            lastError =
-              err instanceof Error
-                ? err
-                : new Error('Unknown connection error');
-            console.error(
-              `Bunker connection attempt ${attempt} failed:`,
-              lastError.message
-            );
-
-            if (attempt < maxRetries) {
-              // Wait before retrying (exponential backoff)
-              const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-              console.log(`Waiting ${delayMs}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-          }
-        }
-
-        // If we get here, all attempts failed
-        console.error('All bunker connection attempts failed');
-        setBunkerStatus('error');
-        setBunkerError(
-          `Failed to connect to bunker after ${maxRetries} attempts. Last error: ${
-            lastError?.message || 'Unknown error'
-          }`
+        await connectToBunkerWithRetry(bunkerConnectionConfiguration, 10000);
+        await storage.saveBunkerToken(bunkerConnectionToken);
+        await storage.saveBunkerLocalSecretKey(localSecretKey);
+        await storage.saveBunkerPublicKey(
+          bunkerConnectionConfiguration.publicKey
         );
       } catch (err) {
-        console.error('Failed to setup bunker connection:', err);
-        setBunkerStatus('error');
-        setBunkerError(
+        console.error('Failed to handle bunker connection token:', err);
+        error(
           err instanceof Error
             ? err.message
             : 'Failed to setup bunker connection'
         );
       }
     },
-    []
+    [configureBunkerConnection, connectToBunkerWithRetry, disconnected, error]
   );
 
   const bunkerLogout = useCallback(async () => {
-    setBunkerConnectionToken(null);
-    setBunkerStatus('disconnected');
-    setBunkerError(null);
+    disconnected();
     setBunkerSigner(null);
-    setBunkerLocalSecretKey(null);
-    setBunkerPublicKey(null);
+    setBunkerConnectionConfiguration(null);
     // Clear from storage
     await storage.clearAll();
   }, []);
 
-  const setLocalSecretKey = useCallback(async (sk: Uint8Array) => {
-    setBunkerLocalSecretKey(sk);
-    // Save to storage
-    await storage.saveBunkerLocalSecretKey(sk);
-  }, []);
-
   return {
-    bunkerConnectionToken,
-    setBunkerConnectionToken,
+    bunkerConnectionConfiguration,
+    configureBunkerConnection,
     handleBunkerConnectionToken,
     bunkerStatus,
     bunkerError,
     bunkerSigner,
-    localSecretKey: bunkerLocalSecretKey,
-    setLocalSecretKey,
     bunkerLogout,
-    setBunkerLocalSecretKey,
-    bunkerPublicKey,
   };
 }
 
@@ -551,7 +529,7 @@ export function useUserAuthenticationState(
       bunkerAuth.bunkerStatus === 'connected'
     ) {
       // Get public key from bunker auth state
-      pubkey = bunkerAuth.bunkerPublicKey;
+      pubkey = bunkerAuth.bunkerConnectionConfiguration?.publicKey || null;
     }
 
     setUserPublicKey(pubkey);
@@ -559,7 +537,7 @@ export function useUserAuthenticationState(
     secretKeyAuth.localSecretKey,
     bunkerAuth.bunkerSigner,
     bunkerAuth.bunkerStatus,
-    bunkerAuth.bunkerPublicKey,
+    bunkerAuth.bunkerConnectionConfiguration?.publicKey,
   ]);
 
   // Check for existing authentication when auth states change
@@ -591,13 +569,14 @@ export function useUserAuthenticationState(
       // 2. User has a bunker connection token (bunker mode) - we consider them configured
       //    even if not yet connected, as they have the necessary credentials
       const hasSecretKey = secretKeyAuth.localSecretKey !== null;
-      const hasBunkerCredentials = bunkerAuth.bunkerConnectionToken !== null;
+      const hasBunkerCredentials =
+        bunkerAuth.bunkerConnectionConfiguration !== null;
 
       setIsConfigured(hasSecretKey || hasBunkerCredentials);
     };
 
     checkConfiguration();
-  }, [secretKeyAuth.localSecretKey, bunkerAuth.bunkerConnectionToken]);
+  }, [secretKeyAuth.localSecretKey, bunkerAuth.bunkerConnectionConfiguration]);
 
   return {
     isAuthenticated,

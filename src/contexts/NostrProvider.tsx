@@ -132,7 +132,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Compute aggregated nostrStatus for display
   const nostrStatus = useMemo(() => {
     // If using bunker authentication, use bunker status
-    if (bunkerAuth.bunkerConnectionToken && bunkerAuth.localSecretKey) {
+    if (bunkerAuth.bunkerConnectionConfiguration) {
       return bunkerAuth.bunkerStatus;
     }
 
@@ -144,8 +144,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     // No authentication method configured
     return 'disconnected';
   }, [
-    bunkerAuth.bunkerConnectionToken,
-    bunkerAuth.localSecretKey,
+    bunkerAuth.bunkerConnectionConfiguration,
     bunkerAuth.bunkerStatus,
     secretKeyAuth.localSecretKey,
     connectionState.isConnected,

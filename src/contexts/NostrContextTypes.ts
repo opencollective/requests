@@ -8,6 +8,7 @@ import type {
 import type { BunkerSigner } from 'nostr-tools/nip46';
 import type { OpenBunkerResponse } from '../api/openbunker';
 import type { RequestFormData } from '../types/RequestFormSchema';
+import type { BunkerConnectionConfiguration } from '../hooks/useNostrStates';
 
 // Event queue item for pending events
 export interface EventQueueItem {
@@ -78,8 +79,11 @@ export interface SecretKeyAuthState {
 
 // Bunker authentication specific state
 export interface BunkerAuthState {
-  bunkerConnectionToken: string | null;
-  setBunkerConnectionToken: (token: string) => void;
+  bunkerConnectionConfiguration: BunkerConnectionConfiguration | null;
+  configureBunkerConnection: (
+    bunkerConnectionToken: string,
+    localSecretKey: Uint8Array
+  ) => Promise<BunkerConnectionConfiguration>;
   handleBunkerConnectionToken: (
     bunkerConnectionToken: string,
     localSecretKey: Uint8Array
@@ -87,10 +91,6 @@ export interface BunkerAuthState {
   bunkerStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   bunkerError: string | null;
   bunkerSigner: BunkerSigner | null;
-  localSecretKey: Uint8Array | null; // Local secret key used with bunker
-  setLocalSecretKey: (sk: Uint8Array) => void;
-  bunkerPublicKey: string | null; // Public key from the bunker
-
   bunkerLogout: () => Promise<void>;
 }
 

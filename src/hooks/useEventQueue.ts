@@ -82,6 +82,9 @@ export function useEventQueue(
           ]);
         } catch (error) {
           // Mark as failed
+          console.error(
+            error instanceof Error ? error.message : 'Unknown error'
+          );
           setQueue(prevQueue =>
             prevQueue.map(qItem =>
               qItem.id === item.id
