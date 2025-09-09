@@ -55,7 +55,6 @@ export const RequestDetailPage: React.FC = () => {
 
   // Process events into request and thread
   useEffect(() => {
-    console.log('events', events);
     const uniqueEvents = events.filter(
       (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
     );
