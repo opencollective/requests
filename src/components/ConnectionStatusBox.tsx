@@ -18,7 +18,7 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
   const {
     userPublicKey,
     bunkerStatus,
-    bunkerPublicKey,
+    bunkerConnectionConfiguration,
     localSecretKey,
     isAuthenticated,
     isSubmitting: isOpenBunkerSubmitting,
@@ -28,7 +28,7 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
   } = useNostr();
 
   // Determine authentication method and status
-  const hasBunkerData = bunkerPublicKey;
+  const hasBunkerData = bunkerConnectionConfiguration !== null;
   const isUsingBunker = hasBunkerData && localSecretKey;
   const isUsingLocalKey = localSecretKey && !hasBunkerData;
   const authMethod = isUsingBunker
@@ -38,7 +38,9 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
       : 'None';
 
   // Get the active public key
-  const activePublicKey = isUsingBunker ? bunkerPublicKey : userPublicKey;
+  const activePublicKey = isUsingBunker
+    ? bunkerConnectionConfiguration.publicKey
+    : userPublicKey;
 
   return (
     <div className="bg-gray-50 rounded-lg p-2 shadow-sm border border-gray-200 inline-block">
@@ -163,7 +165,8 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-600">Key:</span>
                     <code className="text-xs bg-gray-200 p-0.5 rounded font-mono max-w-24 truncate">
-                      {bunkerPublicKey?.slice(0, 12)}...
+                      {bunkerConnectionConfiguration?.publicKey?.slice(0, 12)}
+                      ...
                     </code>
                   </div>
                 </div>

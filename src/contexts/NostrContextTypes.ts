@@ -79,6 +79,7 @@ export interface SecretKeyAuthState {
   localSecretKey: Uint8Array | null;
   secretKeyError: string | null;
   secretKeyLogout: () => Promise<void>;
+  setLocalSecretKey: (secretKey: Uint8Array) => void;
 }
 
 // Bunker authentication specific state

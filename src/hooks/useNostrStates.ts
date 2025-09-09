@@ -227,9 +227,7 @@ export function useNostrConnectionState(): NostrConnectionState & {
   };
 }
 
-export function useSecretKeyAuthState(): SecretKeyAuthState & {
-  setLocalSecretKey: (sk: Uint8Array) => void;
-} {
+export function useSecretKeyAuthState(): SecretKeyAuthState {
   const [localSecretKey, setLocalSecretKeyState] = useState<Uint8Array | null>(
     null
   );
