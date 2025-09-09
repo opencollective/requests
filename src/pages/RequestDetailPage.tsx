@@ -12,23 +12,16 @@ interface ThreadEvent extends Event {
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  const { isConfigured, subscribeToEvents, events, clearEvents } = useNostr();
+  const { isConnected, subscribeToEvents, events, clearEvents } = useNostr();
 
   const [request, setRequest] = useState<Event | null>(null);
   const [thread, setThread] = useState<ThreadEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect to login if not configured
-  useEffect(() => {
-    if (!isConfigured) {
-      navigate('/login');
-    }
-  }, [isConfigured, navigate]);
-
   // Fetch the main request and build the thread
   useEffect(() => {
-    if (!requestId || !isConfigured) return;
+    if (!requestId) return;
 
     setIsLoading(true);
     setError(null);
@@ -58,10 +51,11 @@ export const RequestDetailPage: React.FC = () => {
       setError('Failed to fetch request details');
       setIsLoading(false);
     }
-  }, [requestId, isConfigured, subscribeToEvents, clearEvents]);
+  }, [requestId, subscribeToEvents, clearEvents]);
 
   // Process events into request and thread
   useEffect(() => {
+    console.log('events', events);
     const uniqueEvents = events.filter(
       (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
     );
@@ -162,7 +156,7 @@ export const RequestDetailPage: React.FC = () => {
     }
   };
 
-  if (!isConfigured) {
+  if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
         <div className="text-center">
@@ -210,10 +204,10 @@ export const RequestDetailPage: React.FC = () => {
               The request you're looking for could not be found.
             </p>
             <button
-              onClick={() => navigate('/requests')}
+              onClick={() => navigate('/dashboard')}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Back to Requests
+              Back to Dashboard
             </button>
           </div>
         </div>
@@ -230,10 +224,10 @@ export const RequestDetailPage: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => navigate('/requests')}
+              onClick={() => navigate('/dashboard')}
               className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
-              ← Back to Requests
+              ← Back to Dashboard
             </button>
             <h1 className="text-3xl font-bold text-gray-900">
               Request Details

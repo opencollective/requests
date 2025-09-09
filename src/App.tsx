@@ -7,7 +7,6 @@ import {
 import { NostrProvider } from './contexts/NostrProvider';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { AllRequestsPage } from './pages/AllRequestsPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import RequestPage from './pages/RequestPage';
 import QueueItemPage from './pages/QueueItemPage';
@@ -22,7 +21,6 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/request" element={<RequestPage />} />
-            <Route path="/requests" element={<AllRequestsPage />} />
             <Route
               path="/requests/:requestId"
               element={<RequestDetailPage />}
