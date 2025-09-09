@@ -46,9 +46,13 @@ export interface OpenBunkerState {
   isSubmitting: boolean;
   error: string | null;
   lastResponse: OpenBunkerResponse | null;
-  triggerOpenbunkerLogin: (data: RequestFormData) => Promise<void>;
+  isWaitingForConfirmation: boolean;
+  submitToOpenBunker: (data: RequestFormData) => Promise<void>;
+  confirmBunkerConnection: (secret: string, email: string) => Promise<void>;
   clearError: () => void;
   clearResponse: () => void;
+
+  email: string | null;
 }
 
 // Pool and general Nostr connection state (no authentication required)

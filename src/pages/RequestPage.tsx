@@ -14,7 +14,7 @@ const RequestPage: React.FC = () => {
     submitEvent,
     isSubmitting: isOpenbunkerSubmitting,
     error: openbunkerError,
-    triggerOpenbunkerLogin,
+    submitToOpenBunker,
   } = useNostr();
 
   const defaultEmail = userProfile?.content
@@ -65,8 +65,8 @@ const RequestPage: React.FC = () => {
     // Add to event queue for later processing
     const newQueueItemId = submitEvent(eventData);
 
-    // This will trigger OpenBunker login if needed
-    triggerOpenbunkerLogin(data);
+    // This will submit to OpenBunker and handle authentication if needed
+    submitToOpenBunker(data);
 
     navigate(`/queue/${newQueueItemId}`);
   };

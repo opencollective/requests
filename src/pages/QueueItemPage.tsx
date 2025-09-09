@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import type { ProcessedEventQueueItem } from '../contexts/NostrContextTypes';
@@ -6,7 +6,38 @@ import type { ProcessedEventQueueItem } from '../contexts/NostrContextTypes';
 const QueueItemPage: React.FC = () => {
   const { queueItemId } = useParams<{ queueItemId: string }>();
   const navigate = useNavigate();
-  const { getQueueItemById } = useNostr();
+  const {
+    getQueueItemById,
+    confirmBunkerConnection,
+    isWaitingForConfirmation,
+    isSubmitting,
+    error,
+    email,
+  } = useNostr();
+  const [confirmationCode, setConfirmationCode] = useState<string>('');
+
+  // Handle confirmation code input with validation
+  const handleConfirmationCodeChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = e.target.value;
+    // Only allow digits and limit to 6 characters
+    if (/^\d*$/.test(value) && value.length <= 6) {
+      setConfirmationCode(value);
+    }
+  };
+
+  // Handle confirmation code submission
+  const handleConfirmConnection = async () => {
+    if (confirmationCode.length === 6 && email) {
+      try {
+        await confirmBunkerConnection(confirmationCode, email);
+        // Success - the bunker connection will be established
+      } catch {
+        // Error handling is managed by the OpenBunker state
+      }
+    }
+  };
 
   useEffect(() => {
     if (!queueItemId) {
@@ -15,23 +46,22 @@ const QueueItemPage: React.FC = () => {
     }
 
     const queueItem = getQueueItemById(queueItemId);
-    console.log('Queue item:', queueItem);
     if (!queueItem) {
       // Queue item not found, redirect to dashboard
       navigate('/dashboard');
       return;
     }
 
+    // No need to generate confirmation code - it will be sent by another application
+
     // If the item is completed, redirect to the requests page
     if (queueItem.status === 'completed') {
-      console.log('Queue item completed:', queueItem);
       navigate(`/requests/${(queueItem as ProcessedEventQueueItem).event.id}`);
       return;
     }
 
     // If the item failed, show error and redirect after a delay
     if (queueItem.status === 'failed') {
-      console.log('Queue item failed:', queueItem);
       setTimeout(() => {
         navigate('/dashboard');
       }, 3000);
@@ -80,6 +110,10 @@ const QueueItemPage: React.FC = () => {
   };
 
   const getStatusMessage = (status: string) => {
+    if (isWaitingForConfirmation) {
+      return 'Please enter the confirmation code sent to your email to complete the connection.';
+    }
+
     switch (status) {
       case 'pending':
         return 'Your request is waiting to be processed...';
@@ -123,6 +157,41 @@ const QueueItemPage: React.FC = () => {
               {getStatusMessage(queueItem.status)}
             </p>
 
+            {/* Show confirmation code input if waiting for confirmation */}
+            {isWaitingForConfirmation && (
+              <div className="mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-blue-800 mb-2">
+                    Confirmation Code
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Enter the 6-digit confirmation code sent to you:
+                  </p>
+                  <div className="flex justify-center">
+                    <input
+                      type="text"
+                      value={confirmationCode}
+                      onChange={handleConfirmationCodeChange}
+                      placeholder="000000"
+                      maxLength={6}
+                      className="w-32 text-center text-2xl font-mono font-bold text-blue-900 tracking-wider border border-blue-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  {confirmationCode.length === 6 && (
+                    <div className="mt-3">
+                      <button
+                        onClick={handleConfirmConnection}
+                        disabled={isSubmitting}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSubmitting ? 'Confirming...' : 'Confirm Connection'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {queueItem.status === 'processing' && (
               <div className="mb-6">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -132,6 +201,13 @@ const QueueItemPage: React.FC = () => {
             {queueItem.status === 'failed' && queueItem.error && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
                 <p className="text-sm text-red-700">Error: {queueItem.error}</p>
+              </div>
+            )}
+
+            {/* Show OpenBunker confirmation error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+                <p className="text-sm text-red-700">Error: {error}</p>
               </div>
             )}
 

@@ -305,8 +305,6 @@ export function useBunkerAuthState(): BunkerAuthState {
         bunkerPointer: bunkerPointer,
       };
       setBunkerConnectionConfiguration(bunkerConnectionConfiguration);
-      setBunkerStatus('connecting');
-      setBunkerErrorState(null);
       return bunkerConnectionConfiguration;
     },
     []
@@ -363,6 +361,11 @@ export function useBunkerAuthState(): BunkerAuthState {
       bunkerConnectionConfiguration: BunkerConnectionConfiguration,
       timeoutMs: number
     ) => {
+      if (bunkerStatus === 'connecting') {
+        return;
+      }
+      setBunkerErrorState(null);
+      setBunkerStatus('connecting');
       // Automatically attempt to reconnect when data is loaded from storage
       try {
         // Retry connection with timeout - up to 3 attempts

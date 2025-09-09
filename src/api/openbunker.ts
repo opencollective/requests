@@ -32,6 +32,7 @@ export const openBunkerApi = {
           body: JSON.stringify({
             email: requestData.email,
             name: requestData.name,
+            scope: requestData.scope,
           }),
         }
       );
