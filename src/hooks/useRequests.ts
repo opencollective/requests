@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
+import { getCommunityATagFromEnv } from '../utils/communityUtils';
 
 export interface RequestData {
   id: string;
@@ -40,6 +41,7 @@ export function useRequests() {
         relays,
         {
           kinds: [1111], // NIP-72: Community Request
+          '#a': [getCommunityATagFromEnv()],
           '#t': ['community-request'],
           limit: 100,
         },
