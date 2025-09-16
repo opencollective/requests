@@ -89,6 +89,7 @@ export interface BunkerAuthState {
     bunkerConnectionToken: string,
     localSecretKey: Uint8Array
   ) => Promise<BunkerConnectionConfiguration>;
+  configureBunkerConnectionWithNostrConnect: () => Promise<void>;
   handleBunkerConnectionToken: (
     bunkerConnectionToken: string,
     localSecretKey: Uint8Array

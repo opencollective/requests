@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { SimplePool, getPublicKey } from 'nostr-tools';
+import { SimplePool, generateSecretKey, getPublicKey } from 'nostr-tools';
+
 import type { Event, Filter } from 'nostr-tools';
 import {
   BunkerSigner,
@@ -13,6 +14,10 @@ import type {
   BunkerAuthState,
   UserAuthenticationState,
 } from '../contexts/NostrContextTypes';
+import {
+  bunkerSignerfromURI,
+  createNostrConnectURI,
+} from '../utils/nip46Utils';
 
 // Configure localForage
 localforage.config({
@@ -308,6 +313,57 @@ export function useBunkerAuthState(): BunkerAuthState {
     []
   );
 
+  const configureBunkerConnectionWithNostrConnect = useCallback(async () => {
+    const localSecretKey = generateSecretKey();
+    const secret = Math.random().toString(36).substring(2, 15);
+
+    const connectionUri = createNostrConnectURI({
+      clientPubkey: getPublicKey(localSecretKey),
+      relays: ['wss://relay.nsec.app'],
+      secret: secret,
+      name: 'Community Requests',
+    });
+
+    // Get the OpenBunker URL from environment or use default
+    const baseUrl =
+      import.meta.env.VITE_OPENBUNKER_POPUP_URL || '/openbunker-login-popup';
+
+    // Add query parameters for nostrconnect mode and token
+    const url = new URL(baseUrl, window.location.origin);
+    url.searchParams.set('connectionMode', 'nostrconnect');
+    url.searchParams.set('connectionToken', connectionUri);
+
+    // Create a promise that resolves when the popup closes
+    const popupPromise = new Promise<void>(resolve => {
+      const popupWindow = window.open(
+        url.toString(),
+        'openbunker-login',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popupWindow) {
+        resolve();
+        return;
+      }
+
+      // Check if popup is closed
+      const checkClosed = setInterval(() => {
+        if (popupWindow.closed) {
+          clearInterval(checkClosed);
+          resolve();
+        }
+      }, 1000);
+    });
+
+    // Wait for both the bunker connection and popup to complete
+    const [bunkerSigner] = await Promise.all([
+      bunkerSignerfromURI(localSecretKey, connectionUri),
+      popupPromise,
+    ]);
+
+    // If we get here, connection was successful
+    setBunkerSigner(bunkerSigner as BunkerSigner);
+  }, []);
   const connected = useCallback(() => {
     setBunkerStatus('connected');
     setBunkerErrorState(null);
@@ -497,6 +553,7 @@ export function useBunkerAuthState(): BunkerAuthState {
   return {
     bunkerConnectionConfiguration,
     configureBunkerConnection,
+    configureBunkerConnectionWithNostrConnect,
     handleBunkerConnectionToken,
     bunkerStatus,
     bunkerError,

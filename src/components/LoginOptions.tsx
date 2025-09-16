@@ -5,10 +5,14 @@ import { generateSecretKey } from 'nostr-tools';
 
 export const LoginOptions: React.FC = () => {
   const [showSecretKey, setShowSecretKey] = useState(false);
-  const [popup, setPopup] = useState<Window | null>(null);
+  // const [popup, setPopup] = useState<Window | null>(null);
+  const popup = false;
   const openBunkerUrl =
     import.meta.env.VITE_OPENBUNKER_POPUP_URL || '/openbunker-login-popup';
-  const { handleBunkerConnectionToken } = useNostr();
+  const {
+    handleBunkerConnectionToken,
+    configureBunkerConnectionWithNostrConnect,
+  } = useNostr();
   const navigate = useNavigate();
 
   const handleOpenBunkerSuccess = useCallback(
@@ -45,28 +49,28 @@ export const LoginOptions: React.FC = () => {
     };
   }, [handleOpenBunkerSuccess]);
 
-  const handleOpenBunkerPopup = () => {
-    console.log('handleOpenBunkerPopup');
-    // Create a popup with the configured OpenBunker URL
-    const popupWindow = window.open(
-      openBunkerUrl,
-      'openbunker-login',
-      'width=500,height=600,scrollbars=yes,resizable=yes'
-    );
+  // const handleOpenBunkerPopup = () => {
+  //   console.log('handleOpenBunkerPopup');
+  //   // Create a popup with the configured OpenBunker URL
+  //   const popupWindow = window.open(
+  //     openBunkerUrl,
+  //     'openbunker-login',
+  //     'width=500,height=600,scrollbars=yes,resizable=yes'
+  //   );
 
-    if (popupWindow) {
-      setPopup(popupWindow);
+  //   if (popupWindow) {
+  //     setPopup(popupWindow);
 
-      // Check if popup is closed
-      const checkClosed = setInterval(() => {
-        console.log('checkClosed', popupWindow.closed);
-        if (popupWindow.closed) {
-          clearInterval(checkClosed);
-          setPopup(null);
-        }
-      }, 1000);
-    }
-  };
+  //     // Check if popup is closed
+  //     const checkClosed = setInterval(() => {
+  //       console.log('checkClosed', popupWindow.closed);
+  //       if (popupWindow.closed) {
+  //         clearInterval(checkClosed);
+  //         setPopup(null);
+  //       }
+  //     }, 1000);
+  //   }
+  // };
 
   if (showSecretKey) {
     return (
@@ -132,7 +136,7 @@ export const LoginOptions: React.FC = () => {
           </div>
 
           <button
-            onClick={handleOpenBunkerPopup}
+            onClick={() => configureBunkerConnectionWithNostrConnect()}
             disabled={!!popup}
             className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-3"
           >
