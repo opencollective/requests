@@ -15,7 +15,7 @@ import type { Signer } from 'nostr-tools/signer';
 
 export class BunkerSigner implements Signer {
   private params: BunkerSignerParams;
-  private pool: AbstractSimplePool;
+  pool: AbstractSimplePool;
   private subCloser: SubCloser | undefined;
   private isOpen: boolean;
   private serial: number;
@@ -29,7 +29,7 @@ export class BunkerSigner implements Signer {
   private waitingForAuth: { [id: string]: boolean };
   private secretKey: Uint8Array;
   // If the client initiates the connection, the two variables below can be filled in later.
-  private conversationKey!: Uint8Array;
+  conversationKey!: Uint8Array;
   public bp!: BunkerPointer;
 
   private cachedPubKey: string | undefined;
@@ -143,7 +143,7 @@ export class BunkerSigner implements Signer {
     });
   }
 
-  private setupSubscription(params: BunkerSignerParams) {
+  setupSubscription(params: BunkerSignerParams) {
     const listeners = this.listeners;
     const waitingForAuth = this.waitingForAuth;
     const convKey = this.conversationKey;

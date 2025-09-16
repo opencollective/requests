@@ -1,10 +1,36 @@
 import { useState, useCallback } from 'react';
 import type { Event, UnsignedEvent } from 'nostr-tools';
-import type {
-  EventQueueItem,
-  EventQueueState,
-  ProcessedEventQueueItem,
-} from '../contexts/NostrContextTypes';
+
+// Event queue item for pending events
+export interface EventQueueItem {
+  id: string;
+  event: UnsignedEvent;
+  timestamp: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface ProcessedEventQueueItem {
+  id: string;
+  event: Event;
+  timestamp: number;
+  status: 'completed' | 'failed';
+  error?: string;
+}
+
+// Event queue state
+export interface EventQueueState {
+  queue: EventQueueItem[];
+  processedQueue: ProcessedEventQueueItem[];
+  isProcessing: boolean;
+  addToQueue: (event: UnsignedEvent) => string; // Returns the queue item ID
+  removeFromQueue: (id: string) => void;
+  clearQueue: () => void;
+  getQueueItemById: (
+    id: string
+  ) => EventQueueItem | ProcessedEventQueueItem | undefined;
+  processQueue: () => Promise<void>;
+}
 
 export function useEventQueue(
   sendEvent?: (event: UnsignedEvent) => Promise<Event>

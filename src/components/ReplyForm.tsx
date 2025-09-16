@@ -10,7 +10,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
   requestId,
   onReplyAdded,
 }) => {
-  const { isAuthenticated, userPublicKey, submitEvent } = useNostr();
+  const { userPublicKey, submitEvent } = useNostr();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
       return;
     }
 
-    if (!isAuthenticated || !userPublicKey) {
+    if (!userPublicKey) {
       setError('You must be authenticated to reply');
       return;
     }

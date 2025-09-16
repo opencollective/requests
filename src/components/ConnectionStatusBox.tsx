@@ -20,10 +20,12 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
     bunkerStatus,
     bunkerConnectionConfiguration,
     localSecretKey,
-    isAuthenticated,
-    isSubmitting: isOpenBunkerSubmitting,
+    isConfigured,
+    isOBAPISubmitting: isOpenBunkerSubmitting,
     error: openBunkerError,
     lastResponse: lastOpenBunkerResponse,
+    isWaitingForConfirmation,
+    email,
     nostrStatus,
   } = useNostr();
 
@@ -94,7 +96,7 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
 
           {/* Login/Logout Button */}
 
-          {isAuthenticated && onLogout ? (
+          {isConfigured && onLogout ? (
             <button
               onClick={onLogout}
               className="px-3 py-1 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-all duration-200"
@@ -215,7 +217,9 @@ export const ConnectionStatusBox: React.FC<ConnectionStatusBoxProps> = ({
           {/* OpenBunker State Information */}
           {(isOpenBunkerSubmitting ||
             openBunkerError ||
-            lastOpenBunkerResponse) && (
+            lastOpenBunkerResponse ||
+            isWaitingForConfirmation ||
+            email) && (
             <div className="pt-3 border-t border-gray-200">
               <h3 className="text-sm font-semibold text-gray-900 mb-2">
                 OpenBunker Status

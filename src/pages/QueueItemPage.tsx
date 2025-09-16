@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
-import type { ProcessedEventQueueItem } from '../contexts/NostrContextTypes';
+import type { ProcessedEventQueueItem } from '../hooks/useEventQueue';
 
 const QueueItemPage: React.FC = () => {
   const { queueItemId } = useParams<{ queueItemId: string }>();
@@ -10,7 +10,7 @@ const QueueItemPage: React.FC = () => {
     getQueueItemById,
     confirmBunkerConnection,
     isWaitingForConfirmation,
-    isSubmitting,
+    isOBAPISubmitting,
     error,
     email,
   } = useNostr();
@@ -181,10 +181,12 @@ const QueueItemPage: React.FC = () => {
                     <div className="mt-3">
                       <button
                         onClick={handleConfirmConnection}
-                        disabled={isSubmitting}
+                        disabled={isOBAPISubmitting}
                         className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isSubmitting ? 'Confirming...' : 'Confirm Connection'}
+                        {isOBAPISubmitting
+                          ? 'Confirming...'
+                          : 'Confirm Connection'}
                       </button>
                     </div>
                   )}

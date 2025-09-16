@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { EventQueueItem } from '../contexts/NostrContextTypes';
 import { useNostr } from '../hooks/useNostr';
+import type { EventQueueItem } from '../hooks/useEventQueue';
 
 export const EventQueueHeader: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
