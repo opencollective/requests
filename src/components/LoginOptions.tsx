@@ -115,20 +115,6 @@ export const LoginOptions: React.FC = () => {
           <strong>OpenBunker:</strong> Use Discord OAuth to get a new Nostr key
         </p>
       </div>
-
-      <div className="border-t pt-6">
-        <div className="text-center">
-          <p className="text-sm text-gray-600 mb-3">
-            Don't want to authenticate right now?
-          </p>
-          <button
-            onClick={() => navigate('/request')}
-            className="text-blue-600 hover:text-blue-700 underline text-sm font-medium"
-          >
-            Submit a request without authentication
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

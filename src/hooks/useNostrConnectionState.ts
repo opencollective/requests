@@ -1,14 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SimplePool } from 'nostr-tools';
-
-import type { Event, Filter } from 'nostr-tools';
 
 const relays = [
   'wss://relay.chorus.community',
   'wss://relay.damus.io',
   'wss://nos.lol',
-  'wss://relay.snort.social',
-  // 'wss://nostr.wine',
 ];
 
 // Pool and general Nostr connection state (no authentication required)
@@ -17,20 +13,13 @@ export interface NostrConnectionState {
   isConnected: boolean;
   relays: string[];
   error: string | null;
-  // FIXME get rid of this
-  events: Event[];
-  subscribeToEvents: (filter: Filter) => (() => void) | undefined;
-  clearEvents: () => void;
 }
 
-export function useNostrConnectionState(): NostrConnectionState & {
-  subscribeToEvents: (filter: Filter) => (() => void) | undefined;
-  clearEvents: () => void;
-} {
+export function useNostrConnectionState(): NostrConnectionState {
   const [pool, setPool] = useState<SimplePool | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
+  const poolRef = useRef<SimplePool | null>(null);
 
   // Initialize Nostr pool
   useEffect(() => {
@@ -38,11 +27,10 @@ export function useNostrConnectionState(): NostrConnectionState & {
       try {
         const newPool = new SimplePool();
         setPool(newPool);
+        poolRef.current = newPool;
         setIsConnected(true);
-        console.log('Pool initialized');
         setConnectionError(null);
-      } catch (err) {
-        console.error('Failed to initialize Nostr pool:', err);
+      } catch {
         setConnectionError('Failed to connect to Nostr relays');
         setIsConnected(false);
       }
@@ -52,58 +40,16 @@ export function useNostrConnectionState(): NostrConnectionState & {
     initPool();
 
     return () => {
-      if (pool) {
-        pool.close(relays);
+      if (poolRef.current) {
+        poolRef.current.close(relays);
       }
     };
   }, []); // Empty dependency array - only run once on mount
-
-  // Subscribe to events (no authentication required)
-  const subscribeToEvents = useCallback(
-    (filter: Filter) => {
-      if (!pool) return;
-
-      try {
-        const sub = pool.subscribe(relays, filter, {
-          onevent(event) {
-            console.log('Received Nostr event:', event);
-            setEvents(prevEvents => {
-              // Avoid duplicates by checking if event already exists
-              const exists = prevEvents.some(e => e.id === event.id);
-              if (!exists) {
-                return [...prevEvents, event];
-              }
-              return prevEvents;
-            });
-          },
-          oneose() {
-            console.log('Subscription ended');
-          },
-        });
-
-        return () => {
-          sub.close();
-        };
-      } catch (err) {
-        console.error('Failed to subscribe to events:', err);
-        setConnectionError('Failed to subscribe to Nostr events');
-      }
-    },
-    [pool]
-  );
-
-  // Clear events (no authentication required)
-  const clearEvents = useCallback(() => {
-    setEvents([]);
-  }, []);
 
   return {
     pool,
     isConnected,
     relays,
     error: connectionError,
-    events,
-    subscribeToEvents,
-    clearEvents,
   };
 }
