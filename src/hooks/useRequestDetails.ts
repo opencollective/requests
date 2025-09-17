@@ -6,8 +6,6 @@ const relays = [
   'wss://relay.chorus.community',
   'wss://relay.damus.io',
   'wss://nos.lol',
-  'wss://relay.snort.social',
-  // 'wss://nostr.wine',
 ];
 
 export interface ThreadEvent extends Event {
@@ -41,7 +39,6 @@ export function useRequestDetails(
       try {
         const sub = pool.subscribe(relays, filter, {
           onevent(event) {
-            console.log('Received Nostr event:', event);
             setEvents(prevEvents => {
               // Avoid duplicates by checking if event already exists
               const exists = prevEvents.some(e => e.id === event.id);

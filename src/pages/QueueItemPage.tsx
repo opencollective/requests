@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import type { ProcessedEventQueueItem } from '../hooks/useEventQueue';
 
 const QueueItemPage: React.FC = () => {
   const { queueItemId } = useParams<{ queueItemId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Extract backOnCompleted from URL query parameters
+  const backOnCompleted = searchParams.get('backOnCompleted') === 'true';
   const {
     getQueueItemById,
     confirmBunkerConnection,
@@ -54,9 +58,15 @@ const QueueItemPage: React.FC = () => {
 
     // No need to generate confirmation code - it will be sent by another application
 
-    // If the item is completed, redirect to the requests page
+    // If the item is completed, redirect based on backOnCompleted parameter
     if (queueItem.status === 'completed') {
-      navigate(`/requests/${(queueItem as ProcessedEventQueueItem).event.id}`);
+      if (backOnCompleted) {
+        navigate('/dashboard');
+      } else {
+        navigate(
+          `/requests/${(queueItem as ProcessedEventQueueItem).event.id}`
+        );
+      }
       return;
     }
 
@@ -67,7 +77,7 @@ const QueueItemPage: React.FC = () => {
       }, 3000);
       return;
     }
-  }, [queueItemId, getQueueItemById, navigate]);
+  }, [queueItemId, getQueueItemById, navigate, backOnCompleted]);
 
   if (!queueItemId) {
     return null;
@@ -230,10 +240,16 @@ const QueueItemPage: React.FC = () => {
 
               {queueItem.status === 'completed' && (
                 <button
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() =>
+                    backOnCompleted
+                      ? navigate('/dashboard')
+                      : navigate(
+                          `/requests/${(queueItem as ProcessedEventQueueItem).event.id}`
+                        )
+                  }
                   className="w-full bg-green-600 text-white py-3 px-6 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                 >
-                  Back to Dashboard
+                  {backOnCompleted ? 'Back to Dashboard' : 'View Request'}
                 </button>
               )}
             </div>

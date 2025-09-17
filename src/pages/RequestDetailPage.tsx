@@ -8,7 +8,8 @@ export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { isConnected } = useNostr();
-  const { request, thread, isLoading, error } = useRequestDetails(requestId);
+  const { request, thread, isLoading, error, refetch } =
+    useRequestDetails(requestId);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -203,7 +204,7 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Reply Form */}
-          <ReplyForm requestId={requestId!} onReplyAdded={() => {}} />
+          <ReplyForm requestId={requestId!} onReplyAdded={() => refetch()} />
         </div>
       </div>
     </div>

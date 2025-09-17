@@ -365,7 +365,12 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       pubkey = bunkerAuth.bunkerConnectionConfiguration?.publicKey || null;
     }
     return pubkey;
-  }, [secretKeyAuth.localSecretKey, bunkerAuth.bunkerConnectionConfiguration]);
+  }, [
+    secretKeyAuth.localSecretKey,
+    bunkerAuth.bunkerConnectionConfiguration,
+    bunkerAuth.bunkerSigner,
+    bunkerAuth.bunkerStatus,
+  ]);
 
   const value: NostrContextType = {
     // Pool and general Nostr connection state
