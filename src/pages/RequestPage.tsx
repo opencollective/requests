@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
@@ -9,21 +9,15 @@ import { getCommunityATagFromEnv } from '../utils/communityUtils';
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
   const {
-    userProfile,
     userPublicKey,
     submitEvent,
-    isSubmitting: isOpenbunkerSubmitting,
     error: openbunkerError,
     submitToOpenBunker,
   } = useNostr();
 
-  const defaultEmail = userProfile?.content
-    ? JSON.parse(userProfile.content).email || ''
-    : '';
-  const defaultName = userProfile?.content
-    ? JSON.parse(userProfile.content).name || ''
-    : '';
-
+  const defaultEmail = '';
+  const defaultName = '';
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const defaultValues: RequestFormData = {
     name: defaultName,
     email: defaultEmail,
@@ -37,38 +31,43 @@ const RequestPage: React.FC = () => {
   };
 
   const handleSubmission = async (data: RequestFormData) => {
-    // Get community a tag from environment variables
-    const communityATag = getCommunityATagFromEnv();
+    try {
+      setIsSubmitting(true);
 
-    // Create NIP-72 kind 1111 event for community request
-    const eventData = {
-      kind: 1111, // NIP-72: Community Request
-      content: JSON.stringify({
-        subject: data.subject,
-        message: data.message,
-        email: data.email,
-        name: data.name,
-        createdAt: new Date().toISOString(),
-        isAuthenticated: !!userPublicKey, // Track if this was submitted by authenticated user
-      }),
-      tags: [
-        ['d', `request-${Date.now()}`], // Unique identifier
-        ['subject', data.subject],
-        ['t', 'community-request'], // Topic tag
-        // Add community a tag if available
-        ...(communityATag ? [['a', communityATag]] : []),
-      ],
-      created_at: Math.floor(Date.now() / 1000),
-      pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not
-    };
+      // Get community a tag from environment variables
+      const communityATag = getCommunityATagFromEnv();
 
-    // Add to event queue for later processing
-    const newQueueItemId = submitEvent(eventData);
+      // Create NIP-72 kind 1111 event for community request
+      const eventData = {
+        kind: 1111, // NIP-72: Community Request
+        content: JSON.stringify({
+          subject: data.subject,
+          message: data.message,
+          email: data.email,
+          name: data.name,
+          createdAt: new Date().toISOString(),
+          isAuthenticated: !!userPublicKey, // Track if this was submitted by authenticated user
+        }),
+        tags: [
+          ['d', `request-${Date.now()}`], // Unique identifier
+          ['subject', data.subject],
+          ['t', 'community-request'], // Topic tag
+          // Add community a tag if available
+          ...(communityATag ? [['a', communityATag]] : []),
+        ],
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not
+      };
 
-    // This will submit to OpenBunker and handle authentication if needed
-    submitToOpenBunker(data);
+      // Add to event queue for later processing
+      const newQueueItemId = submitEvent(eventData);
 
-    navigate(`/queue/${newQueueItemId}`);
+      // This will submit to OpenBunker and handle authentication if needed
+      submitToOpenBunker(data);
+      navigate(`/queue/${newQueueItemId}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -94,7 +93,7 @@ const RequestPage: React.FC = () => {
           defaultValues={defaultValues}
           onSubmit={onSubmit}
           onCancel={handleCancel}
-          isSubmitting={isOpenbunkerSubmitting}
+          isSubmitting={isSubmitting}
         />
 
         {openbunkerError && (

@@ -1,124 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
-import type { Event } from 'nostr-tools';
+import { useRequestDetails } from '../hooks/useRequestDetails';
 import { ReplyForm } from '../components/ReplyForm';
-
-interface ThreadEvent extends Event {
-  level: number;
-  isRoot: boolean;
-}
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  const { isConnected, subscribeToEvents, events, clearEvents } = useNostr();
-
-  const [request, setRequest] = useState<Event | null>(null);
-  const [thread, setThread] = useState<ThreadEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch the main request and build the thread
-  useEffect(() => {
-    if (!requestId) return;
-
-    setIsLoading(true);
-    setError(null);
-    clearEvents();
-
-    try {
-      // First, fetch the main request
-      subscribeToEvents({
-        ids: [requestId],
-        limit: 1,
-      });
-
-      // Then fetch the thread (replies and related events)
-      subscribeToEvents({
-        kinds: [1, 30023], // Text notes and community requests
-        '#e': [requestId], // Events that reference this request
-        limit: 100,
-      });
-
-      // Also fetch events that this request references (for building the thread)
-      subscribeToEvents({
-        kinds: [1, 30023],
-        '#e': [requestId],
-        limit: 100,
-      });
-    } catch {
-      setError('Failed to fetch request details');
-      setIsLoading(false);
-    }
-  }, [requestId, subscribeToEvents, clearEvents]);
-
-  // Process events into request and thread
-  useEffect(() => {
-    const uniqueEvents = events.filter(
-      (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
-    );
-
-    if (uniqueEvents.length === 0) return;
-
-    // Find the main request
-    const mainRequest = uniqueEvents.find(event => event.id === requestId);
-    if (mainRequest) {
-      setRequest(mainRequest);
-    }
-
-    // Build the thread following NIP-10
-    const threadEvents: ThreadEvent[] = [];
-
-    // Add the main request as root
-    if (mainRequest) {
-      threadEvents.push({
-        ...mainRequest,
-        level: 0,
-        isRoot: true,
-      });
-    }
-
-    // Process all events that reference this request
-    const allReplies = uniqueEvents.filter(
-      event =>
-        event.id !== requestId &&
-        event.kind === 1 && // Text notes (replies)
-        event.tags.some(tag => tag[0] === 'e' && tag[1] === requestId) &&
-        !threadEvents.some(threadEvent => threadEvent.id === event.id)
-    );
-
-    // Sort replies by timestamp
-    allReplies.sort((a, b) => a.created_at - b.created_at);
-
-    // Build thread hierarchy using NIP-10 logic
-    const processedReplies = allReplies.map(reply => {
-      // Analyze the 'e' tags to determine reply level
-      const eventTags = reply.tags.filter(tag => tag[0] === 'e');
-      let level = 1; // Default level for direct replies
-
-      if (eventTags.length > 1) {
-        // Check if this is a reply to another reply
-        const replyToEventId = eventTags[1]?.[1]; // Second 'e' tag
-        if (replyToEventId && replyToEventId !== requestId) {
-          // This is a reply to another reply
-          level = 2;
-        }
-      }
-
-      return {
-        ...reply,
-        level,
-        isRoot: false,
-      };
-    });
-
-    // Add processed replies to thread
-    threadEvents.push(...processedReplies);
-
-    setThread(threadEvents);
-    setIsLoading(false);
-  }, [events, requestId]);
+  const { isConnected } = useNostr();
+  const { request, thread, isLoading, error, refetch } =
+    useRequestDetails(requestId);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -313,7 +204,7 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Reply Form */}
-          <ReplyForm requestId={requestId!} onReplyAdded={() => {}} />
+          <ReplyForm requestId={requestId!} onReplyAdded={() => refetch()} />
         </div>
       </div>
     </div>

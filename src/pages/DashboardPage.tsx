@@ -10,13 +10,6 @@ export const DashboardPage: React.FC = () => {
   const { logout, isConnected } = useNostr();
   const { requests, isLoading, error, refreshRequests } = useRequests();
 
-  // Redirect to login if not connected
-  useEffect(() => {
-    if (!isConnected) {
-      navigate('/login');
-    }
-  }, [isConnected, navigate]);
-
   // Auto-refresh requests when connected
   useEffect(() => {
     if (isConnected) {

@@ -21,8 +21,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   isEmbed = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
-  const { userProfile } = useNostr();
-
+  const { userPublicKey } = useNostr();
   const {
     register,
     handleSubmit,
@@ -118,13 +117,10 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           )}
         </div>
 
-        {userProfile && (
+        {userPublicKey && (
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
             <p className="text-sm text-blue-700">
-              <strong>Connected as:</strong>{' '}
-              {userProfile.content
-                ? JSON.parse(userProfile.content).name || 'Unknown'
-                : 'Unknown'}
+              <strong>Connected as:</strong> {userPublicKey}
             </p>
           </div>
         )}
