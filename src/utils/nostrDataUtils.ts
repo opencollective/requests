@@ -3,7 +3,7 @@
  * Centralized functions for creating Nostr events and filters
  */
 
-import type { Event, Filter, UnsignedEvent } from 'nostr-tools';
+import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
 import { getCommunityATagFromEnv } from './communityUtils';
 import type { RequestFormData } from '../types/RequestFormSchema';
 
@@ -117,6 +117,7 @@ export const createReplyEvent = (
   const tags: string[][] = [
     ['e', requestId, '', 'root'], // Reference to the root request
     ['p', requestPubkey], // Reference to the root request
+    ['A', getCommunityATagFromEnv()], // Community A tag
   ];
 
   return {
