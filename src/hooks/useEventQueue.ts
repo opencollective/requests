@@ -116,7 +116,9 @@ export function useEventQueue(
                     ...qItem,
                     status: 'failed',
                     error:
-                      error instanceof Error ? error.message : 'Unknown error',
+                      error instanceof Error
+                        ? error.message
+                        : error?.toString(),
                   }
                 : qItem
             )

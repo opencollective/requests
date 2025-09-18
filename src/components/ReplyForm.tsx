@@ -3,14 +3,17 @@ import { useNostr } from '../hooks/useNostr';
 import { type UnsignedEvent } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { useNavigate } from 'react-router-dom';
+import { createReplyEvent } from '../utils/nostrDataUtils';
 
 interface ReplyFormProps {
   requestId: string;
+  requestPubkey: string;
   onReplyAdded: (newEvent?: UnsignedEvent) => void;
 }
 
 export const ReplyForm: React.FC<ReplyFormProps> = ({
   requestId,
+  requestPubkey,
   onReplyAdded,
 }) => {
   const {
@@ -41,16 +44,8 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     try {
       if (userPublicKey) {
         // User is authenticated, proceed with normal flow
-        const replyEvent: UnsignedEvent = {
-          kind: 1,
-          content: message,
-          tags: [
-            ['e', requestId, '', 'root'], // Reference to the root request
-            // ['p', ], // Reference to the author
-          ],
-          created_at: Math.floor(Date.now() / 1000),
-          pubkey: userPublicKey,
-        };
+        const replyEvent = createReplyEvent(requestId, requestPubkey, message);
+
         // Use submitEvent to add to queue instead of sending immediately
         submitEvent(replyEvent);
 
@@ -79,17 +74,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           message: message.trim(),
         };
 
-        const replyEvent: UnsignedEvent = {
-          kind: 1,
-          content: message,
-          tags: [
-            ['e', requestId, '', 'root'], // Reference to the root request
-            // FIXME need to get those pubkeys
-            // ['p', userPublicKey], // Reference to the author
-          ],
-          created_at: Math.floor(Date.now() / 1000),
-          pubkey: userPublicKey || '',
-        };
+        const replyEvent = createReplyEvent(requestId, requestPubkey, message);
 
         // Add to event queue for later processing
         const newQueueItemId = submitEvent(replyEvent);
