@@ -1,6 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNostr } from './useNostr';
 import type { Event, Filter } from 'nostr-tools';
+import {
+  createEventByIdFilter,
+  createThreadFilter,
+  processThreadEvents,
+} from '../utils/nostrDataUtils';
 
 const relays = [
   'wss://relay.chorus.community',
@@ -49,15 +54,14 @@ export function useRequestDetails(
             });
           },
           oneose() {
-            console.log('Subscription ended');
+            // Subscription ended
           },
         });
 
         return () => {
           sub.close();
         };
-      } catch (err) {
-        console.error('Failed to subscribe to events:', err);
+      } catch {
         setError('Failed to subscribe to Nostr events');
       }
     },
@@ -74,24 +78,10 @@ export function useRequestDetails(
 
     try {
       // First, fetch the main request
-      subscribeToRequestEvents({
-        ids: [requestId],
-        limit: 1,
-      });
+      subscribeToRequestEvents(createEventByIdFilter(requestId));
 
       // Then fetch the thread (replies and related events)
-      subscribeToRequestEvents({
-        kinds: [1, 30023], // Text notes and community requests
-        '#e': [requestId], // Events that reference this request
-        limit: 100,
-      });
-
-      // Also fetch events that this request references (for building the thread)
-      subscribeToRequestEvents({
-        kinds: [1, 30023],
-        '#e': [requestId],
-        limit: 100,
-      });
+      subscribeToRequestEvents(createThreadFilter(requestId, 100));
     } catch {
       setError('Failed to fetch request details');
       setIsLoading(false);
@@ -112,56 +102,11 @@ export function useRequestDetails(
       setRequest(mainRequest);
     }
 
-    // Build the thread following NIP-10
-    const threadEvents: ThreadEvent[] = [];
-
-    // Add the main request as root
-    if (mainRequest) {
-      threadEvents.push({
-        ...mainRequest,
-        level: 0,
-        isRoot: true,
-      });
+    // Process thread events using the utility function
+    if (requestId) {
+      const threadEvents = processThreadEvents(uniqueEvents, requestId);
+      setThread(threadEvents);
     }
-
-    // Process all events that reference this request
-    const allReplies = uniqueEvents.filter(
-      event =>
-        event.id !== requestId &&
-        event.kind === 1 && // Text notes (replies)
-        event.tags.some(tag => tag[0] === 'e' && tag[1] === requestId) &&
-        !threadEvents.some(threadEvent => threadEvent.id === event.id)
-    );
-
-    // Sort replies by timestamp
-    allReplies.sort((a, b) => a.created_at - b.created_at);
-
-    // Build thread hierarchy using NIP-10 logic
-    const processedReplies = allReplies.map(reply => {
-      // Analyze the 'e' tags to determine reply level
-      const eventTags = reply.tags.filter(tag => tag[0] === 'e');
-      let level = 1; // Default level for direct replies
-
-      if (eventTags.length > 1) {
-        // Check if this is a reply to another reply
-        const replyToEventId = eventTags[1]?.[1]; // Second 'e' tag
-        if (replyToEventId && replyToEventId !== requestId) {
-          // This is a reply to another reply
-          level = 2;
-        }
-      }
-
-      return {
-        ...reply,
-        level,
-        isRoot: false,
-      };
-    });
-
-    // Add processed replies to thread
-    threadEvents.push(...processedReplies);
-
-    setThread(threadEvents);
     setIsLoading(false);
   }, [events, requestId]);
 

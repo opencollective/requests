@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { ReplyForm } from '../components/ReplyForm';
+import { type Event } from 'nostr-tools';
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
@@ -23,6 +24,15 @@ export const RequestDetailPage: React.FC = () => {
 
   const getAuthorDisplay = (pubkey: string) => {
     return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+  };
+
+  const parseRequestContent = (request: Event) => {
+    return {
+      subject: request.tags.find(tag => tag[0] === 'title')?.[1] || '',
+      message: request.content,
+      name: request.pubkey,
+      email: '',
+    };
   };
 
   const parseContent = (content: string) => {
@@ -105,7 +115,7 @@ export const RequestDetailPage: React.FC = () => {
     );
   }
 
-  const requestContent = parseContent(request.content);
+  const requestContent = parseRequestContent(request);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -204,7 +214,11 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Reply Form */}
-          <ReplyForm requestId={requestId!} onReplyAdded={() => refetch()} />
+          <ReplyForm
+            requestId={requestId!}
+            requestPubkey={request.pubkey}
+            onReplyAdded={() => refetch()}
+          />
         </div>
       </div>
     </div>

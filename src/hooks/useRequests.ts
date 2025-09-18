@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
-import { getCommunityATagFromEnv } from '../utils/communityUtils';
+import {
+  createCommunityRequestFilterFromEnv,
+  processCommunityRequestEvents,
+} from '../utils/nostrDataUtils';
 
 export interface RequestData {
   id: string;
   subject: string;
   message: string;
-  email: string;
-  name: string;
+  // email: string;
+  // name: string;
   createdAt: string;
   author: string;
   timestamp: number;
@@ -39,15 +42,9 @@ export function useRequests() {
       // Subscribe to NIP-72 community request events (kind 1111 with topic tag)
       const unsubscribe = pool.subscribe(
         relays,
-        {
-          kinds: [1111], // NIP-72: Community Request
-          '#a': [getCommunityATagFromEnv()],
-          '#t': ['community-request'],
-          limit: 100,
-        },
+        createCommunityRequestFilterFromEnv(100),
         {
           onevent(event) {
-            console.log('Received NIP-72 community request event:', event);
             setEvents(prevEvents => {
               // Avoid duplicates by checking if event already exists
               const exists = prevEvents.some(e => e.id === event.id);
@@ -58,15 +55,13 @@ export function useRequests() {
             });
           },
           oneose() {
-            console.log('NIP-72 community requests subscription ended');
             setIsLoading(false);
           },
         }
       );
 
       subscriptionRef.current = unsubscribe;
-    } catch (err) {
-      console.error('Failed to fetch requests:', err);
+    } catch {
       setError('Failed to fetch requests');
       setIsLoading(false);
     }
@@ -86,36 +81,7 @@ export function useRequests() {
   useEffect(() => {
     if (events.length === 0) return;
 
-    const processedRequests: RequestData[] = events
-      .filter(event => event.kind === 1111) // NIP-72: Community Request
-      .map(event => {
-        try {
-          const content = JSON.parse(event.content);
-
-          // Extract community a tag if present (NIP-72)
-          const communityATag =
-            event.tags.find(tag => tag[0] === 'a')?.[1] || '';
-
-          return {
-            id: event.id,
-            subject: content.subject || 'No subject',
-            message: content.message || 'No message',
-            email: content.email || 'No email',
-            name: content.name || 'Anonymous',
-            createdAt:
-              content.createdAt ||
-              new Date(event.created_at * 1000).toISOString(),
-            author: event.pubkey,
-            timestamp: event.created_at,
-            communityATag, // Add community a tag for NIP-72 compliance
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter((request): request is RequestData => request !== null)
-      .sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
-
+    const processedRequests = processCommunityRequestEvents(events);
     setRequests(processedRequests);
   }, [events]);
 

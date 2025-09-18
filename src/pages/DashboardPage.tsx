@@ -196,8 +196,7 @@ export const DashboardPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>From: {request.name}</span>
-                      {request.email && <span>Email: {request.email}</span>}
+                      <span>From: {request.author}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 ml-4">
