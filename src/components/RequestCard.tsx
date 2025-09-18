@@ -52,7 +52,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-gray-500">From:</span>
-            <span className="font-medium text-gray-900">{request.name}</span>
+            <span className="font-medium text-gray-900">{request.subject}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-gray-500">Author:</span>
