@@ -61,7 +61,7 @@ const QueueItemPage: React.FC = () => {
     // If the item is completed, redirect based on backOnCompleted parameter
     if (queueItem.status === 'completed') {
       if (backOnCompleted) {
-        navigate('/dashboard');
+        navigate(-1); // Go back to previous page
       } else {
         navigate(
           `/requests/${(queueItem as ProcessedEventQueueItem).event.id}`

@@ -28,7 +28,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
-  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(!userPublicKey);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,12 +54,6 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
         onReplyAdded(replyEvent);
       } else {
         // User is not authenticated, need to collect email and submit to OpenBunker
-        if (!showEmailForm) {
-          setShowEmailForm(true);
-          setIsSubmitting(false);
-          return;
-        }
-
         if (!email.trim()) {
           setError('Please enter your email address');
           setIsSubmitting(false);
@@ -157,7 +151,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 {isOBAPISubmitting ? 'Submitting...' : 'Sending...'}
               </>
-            ) : showEmailForm && !userPublicKey ? (
+            ) : !userPublicKey ? (
               'Submit Reply'
             ) : (
               'Send Reply'
