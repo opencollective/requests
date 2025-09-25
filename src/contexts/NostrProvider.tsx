@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   finalizeEvent,
   generateSecretKey,
@@ -20,6 +20,14 @@ import {
   type BunkerAuthState,
 } from '../hooks/useBunkerAuthState';
 import { useEventQueue, type EventQueueState } from '../hooks/useEventQueue';
+import {
+  useCommunityEvent,
+  type CommunityEventState,
+} from '../hooks/useCommunityEvent';
+import {
+  useUserMetadata,
+  type UserMetadataState,
+} from '../hooks/useUserMetadata';
 import { NostrContext } from './NostrContext';
 import {
   bunkerSignerfromURI,
@@ -44,6 +52,8 @@ export interface NostrContextType
     SecretKeyAuthState,
     BunkerAuthState,
     EventQueueState,
+    CommunityEventState,
+    UserMetadataState,
     AuthenticatedCallbacks {
   // Computed aggregated nostr status for display
   nostrStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -68,6 +78,49 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const connectionState = useNostrConnectionState();
   const secretKeyAuth = useSecretKeyAuthState();
   const bunkerAuth = useBunkerAuthState();
+  const communityEvent = useCommunityEvent(
+    connectionState.isConnected,
+    connectionState.pool,
+    connectionState.relays
+  );
+
+  // Compute userPublicKey as async value
+  const [userPublicKey, setUserPublicKey] = useState<string | null>(null);
+
+  // Update userPublicKey when authentication state changes
+  useEffect(() => {
+    const updateUserPublicKey = async () => {
+      let pubkey: string | null = null;
+
+      if (secretKeyAuth.localSecretKey) {
+        // Derive public key from local secret key
+        try {
+          pubkey = getPublicKey(secretKeyAuth.localSecretKey);
+        } catch (err) {
+          console.error('Failed to derive public key from secret key:', err);
+        }
+      } else if (
+        bunkerAuth.bunkerSigner &&
+        bunkerAuth.bunkerStatus === 'connected'
+      ) {
+        // Get public key from bunker auth state
+        try {
+          pubkey = (await bunkerAuth.bunkerSigner.getPublicKey()) || null;
+        } catch (err) {
+          console.error('Failed to get public key from bunker signer:', err);
+        }
+      }
+
+      setUserPublicKey(pubkey);
+    };
+
+    updateUserPublicKey();
+  }, [
+    secretKeyAuth.localSecretKey,
+    bunkerAuth.bunkerConnectionConfiguration,
+    bunkerAuth.bunkerSigner,
+    bunkerAuth.bunkerStatus,
+  ]);
 
   // Openbunker specific
   const [isOBAPISubmitting, setIsOBAPISubmitting] = useState(false);
@@ -147,6 +200,23 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Initialize event queue with the sendEvent function
   const eventQueue = useEventQueue(signAndSendEvent);
 
+  // New submitEvent function that adds events to the queue
+  const submitEvent = useCallback(
+    (event: UnsignedEvent) => {
+      const queueItemId = eventQueue.addToQueue(event);
+      return queueItemId;
+    },
+    [eventQueue]
+  );
+
+  const userMetadata = useUserMetadata(
+    connectionState.isConnected,
+    connectionState.pool,
+    connectionState.relays,
+    userPublicKey,
+    submitEvent
+  );
+
   // Logout function that clears all states
   const logout = useCallback(async () => {
     await Promise.all([
@@ -155,16 +225,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     ]);
     eventQueue.clearQueue();
   }, [secretKeyAuth, bunkerAuth, eventQueue]);
-
-  // New submitEvent function that adds events to the queue
-  const submitEvent = useCallback(
-    (event: UnsignedEvent) => {
-      const queueItemId = eventQueue.addToQueue(event);
-      console.log('Event added to queue:', event, 'with ID:', queueItemId);
-      return queueItemId;
-    },
-    [eventQueue]
-  );
 
   // Process queue when authentication becomes available
   React.useEffect(() => {
@@ -185,7 +245,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   const handleOpenBunkerSuccess = useCallback(
-    async (openBunkerEvent: MessageEvent<OpenBunkerAuthSuccessEvent>) => {
+    (openBunkerEvent: MessageEvent<OpenBunkerAuthSuccessEvent>) => {
       try {
         const bunkerConnectionToken = openBunkerEvent.data.secretKey;
         const sk = generateSecretKey();
@@ -196,7 +256,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         console.error('Failed to complete OpenBunker authentication:', err);
       }
     },
-    [bunkerAuth.handleBunkerConnectionToken]
+    [bunkerAuth]
   );
 
   const configureBunkerConnectionWithBunkerToken = useCallback(async () => {
@@ -206,7 +266,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         _event: MessageEvent<OpenBunkerAuthSuccessEvent>
       ) => Promise<void>
     );
-  }, [setPopup, handleOpenBunkerSuccess]);
+  }, [handleOpenBunkerSuccess]);
 
   /**
    * This will init the flow from scratch using nostrconnect
@@ -326,7 +386,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         setIsOBAPISubmitting(false);
       }
     },
-    [lastResponse?.bunkerConnectionToken]
+    [bunkerAuth, lastResponse]
   );
   // Compute aggregated nostrStatus for display
   const nostrStatus = useMemo(() => {
@@ -349,31 +409,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     connectionState.isConnected,
   ]);
 
-  const userPublicKey = useMemo(() => {
-    let pubkey: string | null = null;
-
-    if (secretKeyAuth.localSecretKey) {
-      // Derive public key from local secret key
-      try {
-        pubkey = getPublicKey(secretKeyAuth.localSecretKey);
-      } catch (err) {
-        console.error('Failed to derive public key from secret key:', err);
-      }
-    } else if (
-      bunkerAuth.bunkerSigner &&
-      bunkerAuth.bunkerStatus === 'connected'
-    ) {
-      // Get public key from bunker auth state
-      pubkey = bunkerAuth.bunkerConnectionConfiguration?.publicKey || null;
-    }
-    return pubkey;
-  }, [
-    secretKeyAuth.localSecretKey,
-    bunkerAuth.bunkerConnectionConfiguration,
-    bunkerAuth.bunkerSigner,
-    bunkerAuth.bunkerStatus,
-  ]);
-
   const value: NostrContextType = {
     // Pool and general Nostr connection state
     ...connectionState,
@@ -388,6 +423,12 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
     // Event queue state
     ...eventQueue,
+
+    // Community event state
+    ...communityEvent,
+
+    // User metadata state
+    ...userMetadata,
 
     // Computed nostrStatus for display
     nostrStatus,

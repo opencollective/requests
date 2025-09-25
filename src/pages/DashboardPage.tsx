@@ -5,6 +5,7 @@ import { useRequests, type RequestData } from '../hooks/useRequests';
 import { EventQueueHeader } from '../components/EventQueueHeader';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import { RequestFilterControls } from '../components/RequestFilterControls';
+import { TabNavigation } from '../components/TabNavigation';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -92,6 +93,9 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Tab Navigation */}
+      <TabNavigation />
+
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -245,7 +249,7 @@ export const DashboardPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="text-base font-semibold text-gray-900 hover:text-blue-600 truncate">
-                        {request.subject}
+                        {request.title}
                       </h3>
                       <span
                         className={`text-xs px-2 py-1 rounded border ${getStatusStyling(request.status)}`}
@@ -262,7 +266,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3 ml-4">
                     <div className="text-right text-sm text-gray-500">
-                      <div>{formatDate(request.createdAt)}</div>
+                      <div>{formatDate(request.createdAt.toString())}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-blue-600 hover:text-blue-800 text-sm">
