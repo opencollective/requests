@@ -7,11 +7,7 @@ import { OpenBunkerAuthButton } from './OpenBunkerAuthButton';
 export const LoginOptions: React.FC = () => {
   const [showSecretKey, setShowSecretKey] = useState(false);
 
-  const {
-    configureBunkerConnectionWithNostrConnect,
-    configureBunkerConnectionWithBunkerToken,
-    popup,
-  } = useNostr();
+  const { configureBunkerConnectionWithNostrConnect, popup } = useNostr();
   const navigate = useNavigate();
 
   if (showSecretKey) {
@@ -86,15 +82,6 @@ export const LoginOptions: React.FC = () => {
             isLoading={!!popup}
             text="Authenticate with NostrConnect"
           />
-          <OpenBunkerAuthButton
-            onClick={async () => {
-              await configureBunkerConnectionWithBunkerToken();
-              navigate('/dashboard');
-            }}
-            disabled={!!popup}
-            isLoading={!!popup}
-            text="Authenticate with OB Bunker Token"
-          />
         </div>
       </div>
 
@@ -112,7 +99,8 @@ export const LoginOptions: React.FC = () => {
           direct authentication
         </p>
         <p className="text-sm text-gray-500 mt-1">
-          <strong>OpenBunker:</strong> Use Discord OAuth to get a new Nostr key
+          <strong>NostrConnect:</strong> Use NostrConnect and OpenBunker to get
+          your Nostr key
         </p>
       </div>
     </div>
