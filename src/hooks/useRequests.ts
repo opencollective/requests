@@ -69,13 +69,16 @@ export function useRequests() {
     const processedRequests = processCommunityRequestEvents(events);
 
     // Add status information to each request
-    const requestsWithStatus = processedRequests.map((request: RequestData) => {
-      const status = getLatestRequestStatus(statusEvents, request.id) || 'New';
-      return {
-        ...request,
-        status,
-      };
-    });
+    const requestsWithStatus = processedRequests.map(
+      (request: Omit<RequestData, 'status'>) => {
+        const status =
+          getLatestRequestStatus(statusEvents, request.id) || 'New';
+        return {
+          ...request,
+          status,
+        };
+      }
+    );
 
     setRequests(requestsWithStatus);
   }, [events, statusEvents]);

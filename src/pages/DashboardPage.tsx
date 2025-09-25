@@ -28,7 +28,7 @@ export const DashboardPage: React.FC = () => {
     navigate('/request');
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: number) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -266,7 +266,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3 ml-4">
                     <div className="text-right text-sm text-gray-500">
-                      <div>{formatDate(request.createdAt.toString())}</div>
+                      <div>{formatDate(request.createdAt)}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-blue-600 hover:text-blue-800 text-sm">

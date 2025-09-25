@@ -6,6 +6,7 @@
 import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
 import { getCommunityATagFromEnv } from './communityUtils';
 import type { RequestFormData } from '../types/RequestFormSchema';
+import type { RequestData } from '../hooks/useRequests';
 
 // ============================================================================
 // FILTER CREATION FUNCTIONS
@@ -139,7 +140,9 @@ export const createReplyEvent = (
  * @param events - Array of Nostr events
  * @returns Array of processed request data
  */
-export const processCommunityRequestEvents = (events: Event[]) => {
+export const processCommunityRequestEvents = (
+  events: Event[]
+): Omit<RequestData, 'status'>[] => {
   return events
     .filter(event => event.kind === 1111) // NIP-72: Community Request -> NIP-7D
     .map(event => {
@@ -152,10 +155,10 @@ export const processCommunityRequestEvents = (events: Event[]) => {
 
         return {
           id: event.id,
-          subject: titleTag || content,
-          message: content || 'No message',
+          title: titleTag || content,
+          description: content || 'No message',
           author: event.pubkey,
-          createdAt: new Date(event.created_at * 1000).toISOString(),
+          createdAt: event.created_at,
           timestamp: event.created_at,
           communityATag, // Add community a tag for NIP-72 compliance
         };

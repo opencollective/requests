@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
+import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
 import { ReplyForm } from '../components/ReplyForm';
 import {
   createStatusEvent,
@@ -20,6 +21,11 @@ export const RequestDetailPage: React.FC = () => {
   const { isConnected, pool, relays, userPublicKey, bunkerSigner } = useNostr();
   const { request, thread, status, statusEvents, isLoading, error, refetch } =
     useRequestDetails(requestId);
+  const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
+    isConnected,
+    pool,
+    relays
+  );
 
   // Status dropdown state
   const [selectedStatus, setSelectedStatus] = useState(status);
@@ -31,6 +37,31 @@ export const RequestDetailPage: React.FC = () => {
   useEffect(() => {
     setSelectedStatus(status);
   }, [status]);
+
+  // Fetch metadata for all public keys in the request and thread
+  useEffect(() => {
+    if (!request) return;
+
+    const allPubkeys = new Set<string>();
+
+    // Add the request author's pubkey
+    allPubkeys.add(request.pubkey);
+
+    // Add all thread event pubkeys
+    thread.forEach(event => {
+      allPubkeys.add(event.pubkey);
+    });
+
+    // Add all status event pubkeys
+    statusEvents.forEach(event => {
+      allPubkeys.add(event.pubkey);
+    });
+
+    // Fetch metadata for all unique pubkeys
+    allPubkeys.forEach(pubkey => {
+      fetchMetadataForPubkey(pubkey);
+    });
+  }, [request, thread, statusEvents, fetchMetadataForPubkey]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!pool || !relays || !userPublicKey || !bunkerSigner) {
@@ -93,7 +124,7 @@ export const RequestDetailPage: React.FC = () => {
   };
 
   const getAuthorDisplay = (pubkey: string) => {
-    return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+    return getDisplayName(pubkey);
   };
 
   const getStatusStyling = (status: string) => {
@@ -104,7 +135,7 @@ export const RequestDetailPage: React.FC = () => {
     return {
       subject: request.tags.find(tag => tag[0] === 'title')?.[1] || '',
       message: request.content,
-      name: request.pubkey,
+      name: getDisplayName(request.pubkey),
       email: '',
     };
   };
@@ -334,7 +365,7 @@ export const RequestDetailPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="flex items-center gap-2">
                               <span className="font-medium text-gray-900">
-                                Status Update
+                                Status Update by {getDisplayName(event.pubkey)}
                               </span>
                               <span
                                 className={`text-xs px-2 py-1 rounded border ${statusStyling}`}
@@ -347,7 +378,8 @@ export const RequestDetailPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
-                            {getAuthorDisplay(event.pubkey)}
+                            {event.pubkey.slice(0, 8)}...
+                            {event.pubkey.slice(-8)}
                           </div>
                         </div>
                         <p className="text-gray-700 text-sm">
@@ -360,6 +392,7 @@ export const RequestDetailPage: React.FC = () => {
                     // Display regular reply
                     const content = parseContent(event.content);
                     const indentLevel = event.level;
+                    const displayName = getDisplayName(event.pubkey);
 
                     return (
                       <div
@@ -371,7 +404,7 @@ export const RequestDetailPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="flex items-center gap-2">
                               <span className="font-medium text-gray-900">
-                                {content.name}
+                                {displayName}
                               </span>
                               <span className="text-sm text-gray-500">
                                 {formatDate(event.created_at)}
@@ -379,7 +412,8 @@ export const RequestDetailPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
-                            {getAuthorDisplay(event.pubkey)}
+                            {event.pubkey.slice(0, 8)}...
+                            {event.pubkey.slice(-8)}
                           </div>
                         </div>
                         <p className="text-gray-700 whitespace-pre-wrap">
