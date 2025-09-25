@@ -10,7 +10,7 @@ import {
   getStatusLabel,
   getStatusContainerColors,
   type StatusOption,
-} from '../utils/statusEventUtils';
+} from '../utils/statusEventUtils.ts';
 import { getCommunityATagFromEnv } from '../utils/communityUtils';
 import { type Event } from 'nostr-tools';
 
