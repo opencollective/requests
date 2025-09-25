@@ -97,9 +97,7 @@ export function useBunkerAuthState(): BunkerAuthState {
     async (bunkerSigner: BunkerSigner, timeoutMs: number) => {
       try {
         console.log(
-          'Connecting to bunker: client-pubkey',
-          bunkerSigner.bp.pubkey,
-          'signer',
+          'Connecting to bunker with pubkey:',
           bunkerSigner.bp.pubkey
         );
 
