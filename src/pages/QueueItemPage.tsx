@@ -35,7 +35,7 @@ const QueueItemPage: React.FC = () => {
   const handleConfirmConnection = async () => {
     if (confirmationCode.length === 6 && email) {
       try {
-        await confirmBunkerConnection(confirmationCode, email);
+        await confirmBunkerConnection(confirmationCode);
         // Success - the bunker connection will be established
       } catch {
         // Error handling is managed by the OpenBunker state

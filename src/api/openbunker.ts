@@ -59,11 +59,7 @@ export const openBunkerApi = {
     }
   },
 
-  buildBunkerConnectionUrl(
-    result: OpenBunkerResponse,
-    secret: string,
-    email: string
-  ) {
+  buildBunkerConnectionUrl(result: OpenBunkerResponse, secret: string) {
     // Create a new bunker connection token with the secret
     if (!result.bunkerConnectionToken) {
       throw new Error('No bunker connection token available');
@@ -71,7 +67,7 @@ export const openBunkerApi = {
     const url = new URL(result.bunkerConnectionToken);
 
     // FIXME this is a hack to get the secret and email into the bunker connection token
-    const craftedSecret = secret + '+' + email;
+    const craftedSecret = secret;
     url.searchParams.set('secret', craftedSecret);
     return url.toString();
   },

@@ -52,7 +52,7 @@ export interface NostrContextType
   userPublicKey: string | null;
   // API flow
   submitToOpenBunker: (data: RequestFormData) => Promise<void>;
-  confirmBunkerConnection: (secret: string, email: string) => Promise<void>;
+  confirmBunkerConnection: (secret: string) => Promise<void>;
   // Nostr connect flow
   configureBunkerConnectionWithNostrConnect: () => Promise<void>;
   configureBunkerConnectionWithBunkerToken: () => Promise<void>;
@@ -238,9 +238,11 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   }, [bunkerAuth]);
 
   const submitToOpenBunker = async (data: RequestFormData) => {
+    console.log('submitToOpenBunker', data);
     if (hasSigningMethod) {
       return;
     }
+    console.log('submitToOpenBunker 2');
     setIsOBAPISubmitting(true);
     setError(null);
     setIsWaitingForConfirmation(false);
@@ -294,7 +296,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   };
 
   const confirmBunkerConnection = useCallback(
-    async (secret: string, email: string): Promise<void> => {
+    async (secret: string): Promise<void> => {
       if (!lastResponse?.bunkerConnectionToken) {
         throw new Error('No bunker connection token available');
       }
@@ -304,7 +306,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const bunkerConnectionTokenWithSecret =
-          openBunkerApi.buildBunkerConnectionUrl(lastResponse, secret, email);
+          openBunkerApi.buildBunkerConnectionUrl(lastResponse, secret);
 
         // Generate a local secret key and handle the bunker connection
         const localSecretKey = generateSecretKey();
