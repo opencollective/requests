@@ -1,21 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
 import {
   createCommunityRequestFilterFromEnv,
   processCommunityRequestEvents,
 } from '../utils/nostrDataUtils';
+import {
+  createStatusEventFilter,
+  getLatestRequestStatus,
+} from '../utils/statusEventUtils';
 
 export interface RequestData {
   id: string;
-  subject: string;
-  message: string;
-  // email: string;
-  // name: string;
-  createdAt: string;
+  title: string;
+  description: string;
   author: string;
-  timestamp: number;
-  communityATag: string; // Added for NIP-72 compliance
+  createdAt: number;
+  status: string;
 }
 
 export function useRequests() {
@@ -24,43 +25,30 @@ export function useRequests() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
-  const subscriptionRef = useRef<{ close: () => void } | null>(null);
+  const [statusEvents, setStatusEvents] = useState<Event[]>([]);
 
-  const fetchRequests = useCallback(() => {
+  const fetchRequests = useCallback(async () => {
     if (!isConnected || !pool || !relays) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // Clear any existing subscription
-      if (subscriptionRef.current) {
-        subscriptionRef.current.close();
-        subscriptionRef.current = null;
-      }
-
-      // Subscribe to NIP-72 community request events (kind 1111 with topic tag)
-      const unsubscribe = pool.subscribe(
+      // Query for community request events (kind 1111)
+      const requestEvents = await pool.querySync(
         relays,
-        createCommunityRequestFilterFromEnv(100),
-        {
-          onevent(event) {
-            setEvents(prevEvents => {
-              // Avoid duplicates by checking if event already exists
-              const exists = prevEvents.some(e => e.id === event.id);
-              if (!exists) {
-                return [...prevEvents, event];
-              }
-              return prevEvents;
-            });
-          },
-          oneose() {
-            setIsLoading(false);
-          },
-        }
+        createCommunityRequestFilterFromEnv(100)
       );
+      setEvents(requestEvents);
 
-      subscriptionRef.current = unsubscribe;
+      // Query for status events (kind 9078)
+      const statusEventsData = await pool.querySync(
+        relays,
+        createStatusEventFilter(undefined, undefined, 100)
+      );
+      setStatusEvents(statusEventsData);
+
+      setIsLoading(false);
     } catch {
       setError('Failed to fetch requests');
       setIsLoading(false);
@@ -68,22 +56,29 @@ export function useRequests() {
   }, [isConnected, pool, relays]);
 
   const refreshRequests = useCallback(() => {
-    // Clear existing events and subscription
-    setEvents([]);
-    if (subscriptionRef.current) {
-      subscriptionRef.current.close();
-      subscriptionRef.current = null;
-    }
     fetchRequests();
   }, [fetchRequests]);
 
-  // Process events into request data
+  // Process events into request data with status information
   useEffect(() => {
-    if (events.length === 0) return;
+    if (events.length === 0) {
+      setRequests([]);
+      return;
+    }
 
     const processedRequests = processCommunityRequestEvents(events);
-    setRequests(processedRequests);
-  }, [events]);
+
+    // Add status information to each request
+    const requestsWithStatus = processedRequests.map((request: RequestData) => {
+      const status = getLatestRequestStatus(statusEvents, request.id) || 'New';
+      return {
+        ...request,
+        status,
+      };
+    });
+
+    setRequests(requestsWithStatus);
+  }, [events, statusEvents]);
 
   // Auto-fetch when connected
   useEffect(() => {
@@ -91,15 +86,6 @@ export function useRequests() {
       fetchRequests();
     }
   }, [isConnected, fetchRequests]);
-
-  // Cleanup subscription on unmount
-  useEffect(() => {
-    return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.close();
-      }
-    };
-  }, []);
 
   return {
     requests,

@@ -1,14 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
-import { useRequests } from '../hooks/useRequests';
+import { useRequests, type RequestData } from '../hooks/useRequests';
 import { EventQueueHeader } from '../components/EventQueueHeader';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
+import { RequestFilterControls } from '../components/RequestFilterControls';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, isConnected } = useNostr();
   const { requests, isLoading, error, refreshRequests } = useRequests();
+  const [showAllRequests, setShowAllRequests] = useState(false);
 
   // Auto-refresh requests when connected
   useEffect(() => {
@@ -42,6 +44,40 @@ export const DashboardPage: React.FC = () => {
   const getAuthorDisplay = (pubkey: string) => {
     return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
   };
+
+  const getStatusStyling = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'new':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'approved':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'in-progress':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-600 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Filter requests based on showAllRequests state
+  const visibleRequests = requests.filter((request: RequestData) => {
+    if (!showAllRequests) {
+      // Show only new and in-progress requests
+      return (
+        request.status.toLowerCase() === 'new' ||
+        request.status.toLowerCase() === 'in-progress'
+      );
+    }
+    // Show all requests
+    return true;
+  });
 
   if (!isConnected) {
     return (
@@ -83,6 +119,7 @@ export const DashboardPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-4">
               <button
+                type="button"
                 onClick={handleNewRequest}
                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
               >
@@ -102,10 +139,18 @@ export const DashboardPage: React.FC = () => {
                 New Request
               </button>
               <div className="text-sm text-gray-600">
-                {requests.length} request{requests.length !== 1 ? 's' : ''}
+                {visibleRequests.length} request
+                {visibleRequests.length !== 1 ? 's' : ''}
+                {!showAllRequests &&
+                  requests.length > visibleRequests.length && (
+                    <span className="text-gray-400 ml-1">
+                      (of {requests.length} total)
+                    </span>
+                  )}
               </div>
             </div>
             <button
+              type="button"
               onClick={refreshRequests}
               disabled={isLoading}
               className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm disabled:opacity-50"
@@ -135,6 +180,14 @@ export const DashboardPage: React.FC = () => {
           </div>
         )}
 
+        {/* Filter Controls */}
+        {!isLoading && requests.length > 0 && (
+          <RequestFilterControls
+            showAllRequests={showAllRequests}
+            onToggleShowAll={() => setShowAllRequests(!showAllRequests)}
+          />
+        )}
+
         {/* Loading State */}
         {isLoading && (
           <div className="text-center py-12">
@@ -144,7 +197,7 @@ export const DashboardPage: React.FC = () => {
         )}
 
         {/* Empty State */}
-        {!isLoading && requests.length === 0 && (
+        {!isLoading && visibleRequests.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               <svg
@@ -162,12 +215,15 @@ export const DashboardPage: React.FC = () => {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No requests yet
+              {requests.length === 0 ? 'No requests yet' : 'No active requests'}
             </h3>
             <p className="text-gray-600 mb-4">
-              Be the first to submit a community request!
+              {requests.length === 0
+                ? 'Be the first to submit a community request!'
+                : 'No new or in-progress requests at the moment.'}
             </p>
             <button
+              type="button"
               onClick={handleNewRequest}
               className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
             >
@@ -177,9 +233,9 @@ export const DashboardPage: React.FC = () => {
         )}
 
         {/* Requests List */}
-        {!isLoading && requests.length > 0 && (
+        {!isLoading && visibleRequests.length > 0 && (
           <div className="space-y-2">
-            {requests.map(request => (
+            {visibleRequests.map((request: RequestData) => (
               <div
                 key={request.id}
                 className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -191,6 +247,11 @@ export const DashboardPage: React.FC = () => {
                       <h3 className="text-base font-semibold text-gray-900 hover:text-blue-600 truncate">
                         {request.subject}
                       </h3>
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ${getStatusStyling(request.status)}`}
+                      >
+                        {request.status}
+                      </span>
                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                         {getAuthorDisplay(request.author)}
                       </span>

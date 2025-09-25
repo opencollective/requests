@@ -6,6 +6,10 @@ import {
   createThreadFilter,
   processThreadEvents,
 } from '../utils/nostrDataUtils';
+import {
+  createStatusEventFilter,
+  getLatestRequestStatus,
+} from '../utils/statusEventUtils';
 
 const relays = [
   'wss://relay.chorus.community',
@@ -21,6 +25,8 @@ export interface ThreadEvent extends Event {
 export interface RequestDetails {
   request: Event | null;
   thread: ThreadEvent[];
+  status: string;
+  statusEvents: Event[];
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
@@ -32,9 +38,11 @@ export function useRequestDetails(
   const { pool, isConnected } = useNostr();
   const [request, setRequest] = useState<Event | null>(null);
   const [thread, setThread] = useState<ThreadEvent[]>([]);
+  const [status, setStatus] = useState<string>('New');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [statusEvents, setStatusEvents] = useState<Event[]>([]);
 
   // Subscribe to events for a specific request
   const subscribeToRequestEvents = useCallback(
@@ -43,7 +51,7 @@ export function useRequestDetails(
 
       try {
         const sub = pool.subscribe(relays, filter, {
-          onevent(event) {
+          onevent(event: Event) {
             setEvents(prevEvents => {
               // Avoid duplicates by checking if event already exists
               const exists = prevEvents.some(e => e.id === event.id);
@@ -75,6 +83,7 @@ export function useRequestDetails(
     setIsLoading(true);
     setError(null);
     setEvents([]);
+    setStatusEvents([]);
 
     try {
       // First, fetch the main request
@@ -82,6 +91,11 @@ export function useRequestDetails(
 
       // Then fetch the thread (replies and related events)
       subscribeToRequestEvents(createThreadFilter(requestId, 100));
+
+      // Fetch status events for this specific request
+      subscribeToRequestEvents(
+        createStatusEventFilter(requestId, undefined, 100)
+      );
     } catch {
       setError('Failed to fetch request details');
       setIsLoading(false);
@@ -96,19 +110,38 @@ export function useRequestDetails(
 
     if (uniqueEvents.length === 0) return;
 
+    // Separate status events from other events
+    const statusEvents = uniqueEvents.filter(event => event.kind === 9078);
+    const otherEvents = uniqueEvents.filter(event => event.kind !== 9078);
+
+    // Update status events state
+    setStatusEvents(statusEvents);
+
     // Find the main request
-    const mainRequest = uniqueEvents.find(event => event.id === requestId);
+    const mainRequest = otherEvents.find(event => event.id === requestId);
     if (mainRequest) {
       setRequest(mainRequest);
     }
 
     // Process thread events using the utility function
     if (requestId) {
-      const threadEvents = processThreadEvents(uniqueEvents, requestId);
+      const threadEvents = processThreadEvents(otherEvents, requestId);
       setThread(threadEvents);
     }
     setIsLoading(false);
   }, [events, requestId]);
+
+  // Update status when status events change
+  useEffect(() => {
+    if (requestId && statusEvents.length > 0) {
+      const latestStatus = getLatestRequestStatus(statusEvents, requestId);
+      if (latestStatus) {
+        setStatus(latestStatus);
+      }
+    } else if (requestId) {
+      setStatus('New');
+    }
+  }, [statusEvents, requestId]);
 
   // Initial fetch when requestId changes
   useEffect(() => {
@@ -118,6 +151,8 @@ export function useRequestDetails(
   return {
     request,
     thread,
+    status,
+    statusEvents,
     isLoading,
     error,
     refetch: fetchRequestDetails,

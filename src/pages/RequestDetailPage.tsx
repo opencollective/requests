@@ -1,16 +1,86 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { ReplyForm } from '../components/ReplyForm';
+import {
+  createStatusEvent,
+  STATUS_OPTIONS,
+  getStatusColor,
+  getStatusLabel,
+  getStatusContainerColors,
+  type StatusOption,
+} from '../utils/statusEventUtils';
+import { getCommunityATagFromEnv } from '../utils/communityUtils';
 import { type Event } from 'nostr-tools';
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  const { isConnected } = useNostr();
-  const { request, thread, isLoading, error, refetch } =
+  const { isConnected, pool, relays, userPublicKey, bunkerSigner } = useNostr();
+  const { request, thread, status, statusEvents, isLoading, error, refetch } =
     useRequestDetails(requestId);
+
+  // Status dropdown state
+  const [selectedStatus, setSelectedStatus] = useState(status);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState(false);
+
+  // Update selectedStatus when status prop changes
+  useEffect(() => {
+    setSelectedStatus(status);
+  }, [status]);
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!pool || !relays || !userPublicKey || !bunkerSigner) {
+      setStatusError('Not connected to Nostr or missing bunker signer');
+      return;
+    }
+
+    if (newStatus === status) {
+      return; // No change needed
+    }
+
+    setIsUpdatingStatus(true);
+    setStatusError(null);
+    setStatusSuccess(false);
+
+    try {
+      // Create the unsigned status event
+      const unsignedEvent = createStatusEvent(
+        requestId!,
+        newStatus,
+        userPublicKey,
+        {
+          communityATag: getCommunityATagFromEnv(),
+        }
+      );
+
+      // Sign the event using the bunker signer
+      const signedEvent = await bunkerSigner.signEvent(unsignedEvent);
+
+      // Publish the signed status event
+      await pool.publish(relays, signedEvent);
+
+      // Show success message
+      setStatusSuccess(true);
+
+      // Notify parent component to refetch data
+      refetch();
+
+      // Reset success message after a short delay
+      setTimeout(() => {
+        setStatusSuccess(false);
+      }, 2000);
+    } catch {
+      setStatusError('Failed to update status. Please try again.');
+      // Revert the selection on error
+      setSelectedStatus(status);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -24,6 +94,10 @@ export const RequestDetailPage: React.FC = () => {
 
   const getAuthorDisplay = (pubkey: string) => {
     return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
+  };
+
+  const getStatusStyling = (status: string) => {
+    return getStatusColor(status);
   };
 
   const parseRequestContent = (request: Event) => {
@@ -54,6 +128,32 @@ export const RequestDetailPage: React.FC = () => {
         email: '',
       };
     }
+  };
+
+  // Merge status events with thread events for chronological display
+  const getMergedThreadEvents = () => {
+    // Convert status events to a format compatible with thread display
+    const statusThreadEvents = statusEvents.map((event: Event) => ({
+      ...event,
+      level: 0, // Status events are always at root level
+      isRoot: false,
+      type: 'status' as const,
+    }));
+
+    // Convert regular thread events
+    const regularThreadEvents = thread
+      .slice(1)
+      .map((event: Event & { level: number; isRoot: boolean }) => ({
+        ...event,
+        type: 'reply' as const,
+      }));
+
+    // Merge and sort by creation time
+    const allEvents = [...statusThreadEvents, ...regularThreadEvents].sort(
+      (a, b) => a.created_at - b.created_at
+    );
+
+    return allEvents;
   };
 
   if (!isConnected) {
@@ -104,6 +204,7 @@ export const RequestDetailPage: React.FC = () => {
               The request you're looking for could not be found.
             </p>
             <button
+              type="button"
               onClick={() => navigate('/dashboard')}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
@@ -124,6 +225,7 @@ export const RequestDetailPage: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <button
+              type="button"
               onClick={() => navigate('/dashboard')}
               className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
@@ -138,9 +240,31 @@ export const RequestDetailPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  {requestContent.subject || 'No Subject'}
-                </h2>
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {requestContent.subject || 'No Subject'}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedStatus}
+                      onChange={e => {
+                        setSelectedStatus(e.target.value);
+                        handleStatusChange(e.target.value);
+                      }}
+                      disabled={isUpdatingStatus}
+                      className={`text-sm px-3 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${getStatusStyling(selectedStatus)}`}
+                    >
+                      {STATUS_OPTIONS.map((option: StatusOption) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {isUpdatingStatus && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    )}
+                  </div>
+                </div>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <span>From: {requestContent.name}</span>
                   {requestContent.email && (
@@ -164,50 +288,106 @@ export const RequestDetailPage: React.FC = () => {
                 {requestContent.message}
               </p>
             </div>
+
+            {/* Status Messages */}
+            {statusError && (
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
+                {statusError}
+              </div>
+            )}
+
+            {statusSuccess && (
+              <div className="mt-4 bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md text-sm">
+                Status updated successfully!
+              </div>
+            )}
           </div>
 
           {/* Thread */}
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Thread ({thread.length - 1} replies)
+              Activity ({getMergedThreadEvents().length} events)
             </h3>
 
-            {thread.length === 1 ? (
+            {getMergedThreadEvents().length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No replies yet. Be the first to respond!</p>
+                <p>No activity yet. Be the first to respond!</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {thread.slice(1).map(event => {
-                  const content = parseContent(event.content);
-                  const indentLevel = event.level;
+                {getMergedThreadEvents().map(event => {
+                  if (event.type === 'status') {
+                    // Display status event
+                    const statusTag =
+                      event.tags.find(
+                        (tag: string[]) => tag[0] === 'status'
+                      )?.[1] || '';
+                    const statusStyling = getStatusColor(statusTag);
+                    const statusLabel = getStatusLabel(statusTag);
 
-                  return (
-                    <div
-                      key={event.id}
-                      className="border-l-4 border-blue-200 pl-4 py-3"
-                      style={{ marginLeft: `${indentLevel * 16}px` }}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">
-                              {content.name}
+                    return (
+                      <div
+                        key={event.id}
+                        className={getStatusContainerColors(statusTag)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">
+                                Status Update
+                              </span>
+                              <span
+                                className={`text-xs px-2 py-1 rounded border ${statusStyling}`}
+                              >
+                                {statusLabel}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {formatDate(event.created_at)}
+                              </span>
                             </span>
-                            <span className="text-sm text-gray-500">
-                              {formatDate(event.created_at)}
-                            </span>
-                          </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {getAuthorDisplay(event.pubkey)}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {getAuthorDisplay(event.pubkey)}
-                        </div>
+                        <p className="text-gray-700 text-sm">
+                          Request status changed to{' '}
+                          <strong>{statusLabel}</strong>
+                        </p>
                       </div>
-                      <p className="text-gray-700 whitespace-pre-wrap">
-                        {content.message}
-                      </p>
-                    </div>
-                  );
+                    );
+                  } else {
+                    // Display regular reply
+                    const content = parseContent(event.content);
+                    const indentLevel = event.level;
+
+                    return (
+                      <div
+                        key={event.id}
+                        className="border-l-4 border-blue-200 pl-4 py-3"
+                        style={{ marginLeft: `${indentLevel * 16}px` }}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">
+                                {content.name}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {formatDate(event.created_at)}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {getAuthorDisplay(event.pubkey)}
+                          </div>
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-wrap">
+                          {content.message}
+                        </p>
+                      </div>
+                    );
+                  }
                 })}
               </div>
             )}
