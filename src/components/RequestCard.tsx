@@ -10,7 +10,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   request,
   onViewDetails,
 }) => {
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: number) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -38,7 +38,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       <div className="p-6">
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-            {request.subject}
+            {request.title}
           </h3>
           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
             {formatDate(request.createdAt)}
@@ -46,13 +46,13 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         </div>
 
         <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-          {truncateText(request.message, 150)}
+          {truncateText(request.description, 150)}
         </p>
 
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-gray-500">From:</span>
-            <span className="font-medium text-gray-900">{request.subject}</span>
+            <span className="font-medium text-gray-900">{request.title}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-gray-500">Author:</span>
