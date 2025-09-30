@@ -1,7 +1,3 @@
-> **⚠️ NOTE:** This repository is no longer maintained.  
-> **The up-to-date Community Requests App is now at [`opencollective/requests`](https://github.com/opencollective/requests).**  
-> Please submit all issues, requests, and pull requests there.
-
 # Community Requests App
 
 A React-based community request management system that uses OpenBunker for Nostr authentication.
