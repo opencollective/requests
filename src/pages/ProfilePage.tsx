@@ -1,13 +1,9 @@
 import React from 'react';
 import { UserProfile } from '../components/UserProfile';
-import { TabNavigation } from '../components/TabNavigation';
 
 export const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Tab Navigation */}
-      <TabNavigation />
-
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">

@@ -2,14 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequests, type RequestData } from '../hooks/useRequests';
-import { EventQueueHeader } from '../components/EventQueueHeader';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import { RequestFilterControls } from '../components/RequestFilterControls';
-import { TabNavigation } from '../components/TabNavigation';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { logout, isConnected } = useNostr();
+  const { isConnected } = useNostr();
   const { requests, isLoading, error, refreshRequests } = useRequests();
   const [showAllRequests, setShowAllRequests] = useState(false);
 
@@ -93,9 +91,6 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Tab Navigation */}
-      <TabNavigation />
-
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -107,17 +102,8 @@ export const DashboardPage: React.FC = () => {
               Submit and manage community requests
             </p>
           </div>
-          <ConnectionStatusBox
-            onLogout={async () => {
-              await logout();
-              navigate('/login');
-            }}
-          />
+          <ConnectionStatusBox />
         </div>
-
-        {/* Event Queue Header */}
-        <EventQueueHeader />
-
         {/* Action Bar */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

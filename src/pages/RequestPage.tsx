@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
-import { EventQueueHeader } from '../components/EventQueueHeader';
 import { createCommunityRequestEvent } from '../utils/nostrDataUtils';
 
 const RequestPage: React.FC = () => {
@@ -65,9 +64,6 @@ const RequestPage: React.FC = () => {
           <p className="text-lg text-gray-600 mb-6">
             Tell us about your community request
           </p>
-
-          {/* Event Queue Header */}
-          <EventQueueHeader />
         </div>
 
         <RequestForm
