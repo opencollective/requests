@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequests, type RequestData } from '../hooks/useRequests';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
-import { RequestFilterControls } from '../components/RequestFilterControls';
+import {
+  RequestFilterControls,
+  type RequestFilter,
+} from '../components/RequestFilterControls';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { isConnected } = useNostr();
   const { requests, isLoading, error, refreshRequests } = useRequests();
-  const [showAllRequests, setShowAllRequests] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
 
   // Auto-refresh requests when connected
   useEffect(() => {
@@ -65,17 +68,12 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  // Filter requests based on showAllRequests state
+  // Filter requests based on active filter
   const visibleRequests = requests.filter((request: RequestData) => {
-    if (!showAllRequests) {
-      // Show only new and in-progress requests
-      return (
-        request.status.toLowerCase() === 'new' ||
-        request.status.toLowerCase() === 'in-progress'
-      );
+    if (activeFilter === 'all') {
+      return true;
     }
-    // Show all requests
-    return true;
+    return request.status.toLowerCase() === activeFilter.toLowerCase();
   });
 
   if (!isConnected) {
@@ -131,7 +129,7 @@ export const DashboardPage: React.FC = () => {
               <div className="text-sm text-gray-600">
                 {visibleRequests.length} request
                 {visibleRequests.length !== 1 ? 's' : ''}
-                {!showAllRequests &&
+                {activeFilter !== 'all' &&
                   requests.length > visibleRequests.length && (
                     <span className="text-gray-400 ml-1">
                       (of {requests.length} total)
@@ -173,8 +171,8 @@ export const DashboardPage: React.FC = () => {
         {/* Filter Controls */}
         {!isLoading && requests.length > 0 && (
           <RequestFilterControls
-            showAllRequests={showAllRequests}
-            onToggleShowAll={() => setShowAllRequests(!showAllRequests)}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
           />
         )}
 
@@ -205,12 +203,14 @@ export const DashboardPage: React.FC = () => {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {requests.length === 0 ? 'No requests yet' : 'No active requests'}
+              {requests.length === 0
+                ? 'No requests yet'
+                : `No ${activeFilter === 'all' ? '' : activeFilter + ' '}requests`}
             </h3>
             <p className="text-gray-600 mb-4">
               {requests.length === 0
                 ? 'Be the first to submit a community request!'
-                : 'No new or in-progress requests at the moment.'}
+                : `No requests with ${activeFilter === 'all' ? 'any' : activeFilter} status at the moment.`}
             </p>
             <button
               type="button"
