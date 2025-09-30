@@ -9,24 +9,19 @@ const RequestPage: React.FC = () => {
   const navigate = useNavigate();
   const {
     userPublicKey,
+    metadata,
     submitEvent,
     error: openbunkerError,
     submitToOpenBunker,
   } = useNostr();
 
-  const defaultEmail = '';
-  const defaultName = '';
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const defaultValues: RequestFormData = {
-    name: defaultName,
-    email: defaultEmail,
+    name: '',
+    email: '',
     subject: '',
     message: '',
-  };
-
-  const onSubmit = async (data: RequestFormData) => {
-    // Always submit the event to the queue and trigger OpenBunker login
-    await handleSubmission(data);
   };
 
   const handleSubmission = async (data: RequestFormData) => {
@@ -55,26 +50,32 @@ const RequestPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Submit Community Request
-          </h1>
-          <p className="text-lg text-gray-600 mb-6">
-            Tell us about your community request
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900">Make a request</h2>
+          <button
+            onClick={handleCancel}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            Cancel ✕
+          </button>
         </div>
 
-        <RequestForm
-          defaultValues={defaultValues}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isSubmitting={isSubmitting}
-        />
+        {/* Form Section */}
+        <div className="px-6 py-4">
+          <RequestForm
+            defaultValues={defaultValues}
+            onSubmit={handleSubmission}
+            isSubmitting={isSubmitting}
+            userPublicKey={userPublicKey}
+            metadata={metadata}
+          />
+        </div>
 
         {openbunkerError && (
-          <div className="max-w-2xl mx-auto mt-6">
+          <div className="px-6 pb-4">
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               <p className="font-medium">Error:</p>
               <p>{openbunkerError}</p>

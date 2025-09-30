@@ -3,25 +3,39 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { requestFormSchema } from '../types/RequestFormSchema';
-import { useNostr } from '../hooks/useNostr';
+
+interface UserMetadata {
+  name?: string;
+  display_name?: string;
+  about?: string;
+  picture?: string;
+}
 
 interface RequestFormProps {
-  defaultValues: RequestFormData;
-  onSubmit: (data: RequestFormData) => Promise<void>;
-  onCancel: () => void;
+  defaultValues?: RequestFormData;
+  onSubmit: (formData: RequestFormData) => Promise<void>;
   isSubmitting: boolean;
   isEmbed?: boolean;
+  userPublicKey?: string | null;
+  metadata?: UserMetadata | null;
 }
 
 export const RequestForm: React.FC<RequestFormProps> = ({
   defaultValues,
   onSubmit,
-  onCancel,
   isSubmitting,
   isEmbed = false,
+  userPublicKey,
+  metadata,
 }) => {
   const [error, setError] = useState<string | null>(null);
-  const { userPublicKey } = useNostr();
+
+  // State for authenticated users (controlled inputs)
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+
+  const isAuthenticated = !!userPublicKey;
+
   const {
     register,
     handleSubmit,
@@ -31,7 +45,29 @@ export const RequestForm: React.FC<RequestFormProps> = ({
     defaultValues: defaultValues as RequestFormData,
   });
 
-  const handleFormSubmit = async (data: RequestFormData) => {
+  const handleFormSubmit = async (formData: RequestFormData) => {
+    try {
+      setError(null);
+      await onSubmit(formData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleAuthenticatedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!subject.trim() || !message.trim()) {
+      return;
+    }
+
+    const data: RequestFormData = {
+      name: metadata?.name || metadata?.display_name || 'Anonymous User',
+      email: '', // Email not required for authenticated users
+      subject: subject.trim(),
+      message: message.trim(),
+    };
+
     try {
       setError(null);
       await onSubmit(data);
@@ -40,8 +76,108 @@ export const RequestForm: React.FC<RequestFormProps> = ({
     }
   };
 
+  // Render authenticated user form (simple controlled inputs)
+  if (isAuthenticated) {
+    const displayName = metadata?.name || metadata?.display_name || 'Anonymous';
+    const displayAbout =
+      metadata?.about || 'Product Designer and Community Volunteer';
+
+    return (
+      <div className={isEmbed ? 'p-4' : ''}>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* User Profile Section */}
+        <div className="pb-4 border-b border-gray-200 mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
+              {metadata?.picture ? (
+                <img
+                  src={metadata.picture}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <svg
+                  className="w-8 h-8 text-gray-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {displayName}
+              </h3>
+              <p className="text-sm text-gray-600">{displayAbout}</p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleAuthenticatedSubmit} className="space-y-4">
+          {/* Subject Field */}
+          <div>
+            <input
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="Subject"
+              className="w-full px-3 py-2 border-0 border-b border-gray-300 focus:outline-none focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+            />
+          </div>
+
+          {/* Message Field */}
+          <div>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="What would you like to request?"
+              rows={8}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-400 resize-none"
+            />
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={isSubmitting || !subject.trim() || !message.trim()}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Sending...' : 'Send'}
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                style={{ transform: 'rotate(45deg)' }}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // Render non-authenticated user form (react-hook-form with validation)
   return (
-    <div className={`max-w-2xl mx-auto ${isEmbed ? 'p-4' : 'p-8'}`}>
+    <div className={isEmbed ? 'p-4' : ''}>
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -57,7 +193,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             <input
               type="text"
               {...register('name')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Your full name"
             />
             {errors.name && (
@@ -72,7 +208,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
             <input
               type="email"
               {...register('email')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="your.email@example.com"
             />
             {errors.email && (
@@ -90,7 +226,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           <input
             type="text"
             {...register('subject')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="Brief description of your request"
           />
           {errors.subject && (
@@ -106,9 +242,9 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           </label>
           <textarea
             {...register('message')}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Detailed description of your request"
+            rows={8}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            placeholder="What would you like to request?"
           />
           {errors.message && (
             <p className="mt-1 text-sm text-red-600">
@@ -117,29 +253,27 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           )}
         </div>
 
-        {userPublicKey && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <p className="text-sm text-blue-700">
-              <strong>Connected as:</strong> {userPublicKey}
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-4 pt-6">
+        <div className="flex justify-end pt-4 border-t border-gray-200">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Request'}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
+            {isSubmitting ? 'Sending...' : 'Send'}
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{ transform: 'rotate(45deg)' }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
+            </svg>
           </button>
         </div>
       </form>
