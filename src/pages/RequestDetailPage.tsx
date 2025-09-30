@@ -377,10 +377,6 @@ export const RequestDetailPage: React.FC = () => {
                               </span>
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {event.pubkey.slice(0, 8)}...
-                            {event.pubkey.slice(-8)}
-                          </div>
                         </div>
                         <p className="text-gray-700 text-sm">
                           Request status changed to{' '}
@@ -410,10 +406,6 @@ export const RequestDetailPage: React.FC = () => {
                                 {formatDate(event.created_at)}
                               </span>
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {event.pubkey.slice(0, 8)}...
-                            {event.pubkey.slice(-8)}
                           </div>
                         </div>
                         <p className="text-gray-700 whitespace-pre-wrap">
