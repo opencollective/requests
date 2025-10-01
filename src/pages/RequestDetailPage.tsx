@@ -4,6 +4,7 @@ import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
 import { ReplyForm } from '../components/ReplyForm';
+import { QueueItemDisplay } from '../components/QueueItemDisplay';
 import {
   createStatusEvent,
   STATUS_OPTIONS,
@@ -32,6 +33,9 @@ export const RequestDetailPage: React.FC = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusSuccess, setStatusSuccess] = useState(false);
+
+  // Queue state for reply submissions
+  const [queueItemId, setQueueItemId] = useState<string | null>(null);
 
   // Update selectedStatus when status prop changes
   useEffect(() => {
@@ -419,11 +423,30 @@ export const RequestDetailPage: React.FC = () => {
             )}
           </div>
 
+          {/* Queue Item Display for Reply Submissions */}
+          {queueItemId && (
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <QueueItemDisplay
+                queueItemId={queueItemId}
+                onCompleted={() => {
+                  // Hide the queue display and refetch to show the new reply
+                  setQueueItemId(null);
+                  refetch();
+                }}
+                onFailed={() => {
+                  // Hide the queue display on failure
+                  setQueueItemId(null);
+                }}
+              />
+            </div>
+          )}
+
           {/* Reply Form */}
           <ReplyForm
             requestId={requestId!}
             requestPubkey={request.pubkey}
             onReplyAdded={() => refetch()}
+            onQueueItemSet={setQueueItemId}
           />
         </div>
       </div>

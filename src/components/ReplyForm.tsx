@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { useNostr } from '../hooks/useNostr';
 import { type UnsignedEvent } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
-import { useNavigate } from 'react-router-dom';
 import { createReplyEvent } from '../utils/nostrDataUtils';
 
 interface ReplyFormProps {
   requestId: string;
   requestPubkey: string;
+  // eslint-disable-next-line no-unused-vars
   onReplyAdded: (newEvent?: UnsignedEvent) => void;
+  // eslint-disable-next-line no-unused-vars
+  onQueueItemSet?: (id: string | null) => void;
 }
 
 export const ReplyForm: React.FC<ReplyFormProps> = ({
   requestId,
   requestPubkey,
   onReplyAdded,
+  onQueueItemSet,
 }) => {
   const {
     userPublicKey,
@@ -23,7 +26,6 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     isOBAPISubmitting,
     error: openbunkerError,
   } = useNostr();
-  const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,6 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
 
     setIsSubmitting(true);
     setError(null);
-    console.log('userPublicKey', userPublicKey);
     try {
       if (userPublicKey) {
         // User is authenticated, proceed with normal flow
@@ -68,16 +69,18 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           message: message.trim(),
         };
 
+        // Create reply event and add to queue first
         const replyEvent = createReplyEvent(requestId, requestPubkey, message);
 
         // Add to event queue for later processing
         const newQueueItemId = submitEvent(replyEvent);
 
         // This will submit to OpenBunker and handle authentication if needed
-        submitToOpenBunker(replyData);
-        console.log('navigating to queue item page');
-        await navigate(`/queue/${newQueueItemId}?backOnCompleted=true`);
-        // Clear form
+        await submitToOpenBunker(replyData);
+
+        // Show the queue item display after OpenBunker submission
+        onQueueItemSet?.(newQueueItemId);
+
         setMessage('');
         setEmail('');
         setShowEmailForm(false);
@@ -89,6 +92,8 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           ? err.message
           : 'Failed to send reply. Please try again.'
       );
+      // If there was an error, clear the queue display
+      onQueueItemSet?.(null);
     } finally {
       setIsSubmitting(false);
     }

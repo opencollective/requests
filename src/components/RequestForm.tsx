@@ -13,11 +13,13 @@ interface UserMetadata {
 
 interface RequestFormProps {
   defaultValues?: RequestFormData;
-  onSubmit: (formData: RequestFormData) => Promise<void>;
+  // eslint-disable-next-line no-unused-vars
+  onSubmit: (data: RequestFormData) => Promise<void>;
   isSubmitting: boolean;
   isEmbed?: boolean;
   userPublicKey?: string | null;
   metadata?: UserMetadata | null;
+  buttonReplacement?: React.ReactNode;
 }
 
 export const RequestForm: React.FC<RequestFormProps> = ({
@@ -27,6 +29,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   isEmbed = false,
   userPublicKey,
   metadata,
+  buttonReplacement,
 }) => {
   const [error, setError] = useState<string | null>(null);
 
@@ -253,29 +256,35 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           )}
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-gray-200">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Sending...' : 'Send'}
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              style={{ transform: 'rotate(45deg)' }}
+        {buttonReplacement ? (
+          <div className="pt-4 border-t border-gray-200">
+            {buttonReplacement}
+          </div>
+        ) : (
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-              />
-            </svg>
-          </button>
-        </div>
+              {isSubmitting ? 'Sending...' : 'Send'}
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                style={{ transform: 'rotate(45deg)' }}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

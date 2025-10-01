@@ -16,3 +16,15 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Animation for queue status display */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

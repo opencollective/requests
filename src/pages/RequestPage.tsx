@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
+import { QueueItemDisplay } from '../components/QueueItemDisplay';
 import { createCommunityRequestEvent } from '../utils/nostrDataUtils';
 
 const RequestPage: React.FC = () => {
@@ -16,6 +17,10 @@ const RequestPage: React.FC = () => {
   } = useNostr();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedQueueItemId, setSubmittedQueueItemId] = useState<
+    string | null
+  >(null);
+  const queueDisplayRef = useRef<HTMLDivElement>(null);
 
   const defaultValues: RequestFormData = {
     name: '',
@@ -39,7 +44,9 @@ const RequestPage: React.FC = () => {
 
       // This will submit to OpenBunker and handle authentication if needed
       submitToOpenBunker(data);
-      navigate(`/queue/${newQueueItemId}`);
+
+      // Show the queue item display instead of navigating
+      setSubmittedQueueItemId(newQueueItemId);
     } finally {
       setIsSubmitting(false);
     }
@@ -48,6 +55,19 @@ const RequestPage: React.FC = () => {
   const handleCancel = () => {
     navigate('/dashboard');
   };
+
+  // Scroll to queue display when it appears
+  useEffect(() => {
+    if (submittedQueueItemId && queueDisplayRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        queueDisplayRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 150);
+    }
+  }, [submittedQueueItemId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100 flex items-center justify-center p-4">
@@ -71,6 +91,23 @@ const RequestPage: React.FC = () => {
             isSubmitting={isSubmitting}
             userPublicKey={userPublicKey}
             metadata={metadata}
+            buttonReplacement={
+              submittedQueueItemId ? (
+                <div
+                  ref={queueDisplayRef}
+                  className="transition-all duration-300 ease-in-out"
+                  style={{
+                    animation: 'fadeInUp 0.4s ease-out',
+                  }}
+                >
+                  <QueueItemDisplay
+                    queueItemId={submittedQueueItemId}
+                    onCompleted={eventId => navigate(`/requests/${eventId}`)}
+                    onFailed={() => navigate('/dashboard')}
+                  />
+                </div>
+              ) : undefined
+            }
           />
         </div>
 
