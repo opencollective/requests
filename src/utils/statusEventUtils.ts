@@ -66,12 +66,14 @@ export interface StatusEvent extends UnsignedEvent {
  * Creates a filter for status events (kind 9078)
  * @param requestId - Optional request ID to filter by (d tag)
  * @param status - Optional status to filter by
+ * @param moderators - Optional array of moderator pubkeys to filter by
  * @param limit - Maximum number of events to return
  * @returns Filter for status events
  */
 export const createStatusEventFilter = (
   requestId?: string,
   status?: string,
+  moderators?: string[],
   limit: number = 100
 ): Filter => {
   const filter: Filter = {
@@ -87,24 +89,36 @@ export const createStatusEventFilter = (
     filter['#status'] = [status];
   }
 
+  if (moderators && moderators.length > 0) {
+    filter.authors = moderators;
+  }
+
   return filter;
 };
 
 /**
  * Creates a filter for status events by request ID (d tag)
  * @param requestId - The request ID (d tag) to filter by
+ * @param moderators - Optional array of moderator pubkeys to filter by
  * @param limit - Maximum number of events to return
  * @returns Filter for status events by request ID
  */
 export const createStatusEventByRequestIdFilter = (
   requestId: string,
+  moderators?: string[],
   limit: number = 1
 ): Filter => {
-  return {
+  const filter: Filter = {
     kinds: [9078], // Status Event
     '#d': [requestId],
     limit,
   };
+
+  if (moderators && moderators.length > 0) {
+    filter.authors = moderators;
+  }
+
+  return filter;
 };
 
 // ============================================================================
@@ -295,4 +309,17 @@ export const getStatusContainerColors = (status: string): string => {
     default:
       return 'border-l-4 border-gray-200 pl-4 py-3 bg-gray-50';
   }
+};
+
+/**
+ * Checks if a user is a moderator
+ * @param userPubkey - The user's public key to check
+ * @param moderators - Array of moderator public keys
+ * @returns True if the user is a moderator
+ */
+export const isModerator = (
+  userPubkey: string,
+  moderators: string[]
+): boolean => {
+  return moderators.includes(userPubkey);
 };

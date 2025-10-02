@@ -33,7 +33,8 @@ export interface RequestDetails {
 }
 
 export function useRequestDetails(
-  requestId: string | undefined
+  requestId: string | undefined,
+  moderators: string[] = []
 ): RequestDetails {
   const { pool, isConnected } = useNostr();
   const [request, setRequest] = useState<Event | null>(null);
@@ -92,15 +93,15 @@ export function useRequestDetails(
       // Then fetch the thread (replies and related events)
       subscribeToRequestEvents(createThreadFilter(requestId, 100));
 
-      // Fetch status events for this specific request
+      // Fetch status events for this specific request (filtered by moderators)
       subscribeToRequestEvents(
-        createStatusEventFilter(requestId, undefined, 100)
+        createStatusEventFilter(requestId, undefined, moderators, 100)
       );
     } catch {
       setError('Failed to fetch request details');
       setIsLoading(false);
     }
-  }, [requestId, pool, isConnected, subscribeToRequestEvents]);
+  }, [requestId, pool, isConnected, subscribeToRequestEvents, moderators]);
 
   // Process events into request and thread
   useEffect(() => {
@@ -114,7 +115,7 @@ export function useRequestDetails(
     const statusEvents = uniqueEvents.filter(event => event.kind === 9078);
     const otherEvents = uniqueEvents.filter(event => event.kind !== 9078);
 
-    // Update status events state
+    // Update status events state (already filtered by moderators at query level)
     setStatusEvents(statusEvents);
 
     // Find the main request

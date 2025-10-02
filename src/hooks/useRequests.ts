@@ -19,7 +19,7 @@ export interface RequestData {
   status: string;
 }
 
-export function useRequests() {
+export function useRequests(moderators: string[] = []) {
   const { isConnected, pool, relays } = useNostr();
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +41,10 @@ export function useRequests() {
       );
       setEvents(requestEvents);
 
-      // Query for status events (kind 9078)
+      // Query for status events (kind 9078) - filtered by moderators
       const statusEventsData = await pool.querySync(
         relays,
-        createStatusEventFilter(undefined, undefined, 100)
+        createStatusEventFilter(undefined, undefined, moderators, 100)
       );
       setStatusEvents(statusEventsData);
 
@@ -53,7 +53,7 @@ export function useRequests() {
       setError('Failed to fetch requests');
       setIsLoading(false);
     }
-  }, [isConnected, pool, relays]);
+  }, [isConnected, pool, relays, moderators]);
 
   const refreshRequests = useCallback(() => {
     fetchRequests();

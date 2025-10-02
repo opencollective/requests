@@ -11,6 +11,7 @@ import {
   getStatusColor,
   getStatusLabel,
   getStatusContainerColors,
+  isModerator as checkIsModerator,
   type StatusOption,
 } from '../utils/statusEventUtils.ts';
 import { getCommunityATagFromEnv } from '../utils/communityUtils';
@@ -19,9 +20,16 @@ import { type Event } from 'nostr-tools';
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  const { isConnected, pool, relays, userPublicKey, bunkerSigner } = useNostr();
+  const {
+    isConnected,
+    pool,
+    relays,
+    userPublicKey,
+    bunkerSigner,
+    communityInfo,
+  } = useNostr();
   const { request, thread, status, statusEvents, isLoading, error, refetch } =
-    useRequestDetails(requestId);
+    useRequestDetails(requestId, communityInfo?.moderators || []);
   const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
     isConnected,
     pool,
@@ -36,6 +44,12 @@ export const RequestDetailPage: React.FC = () => {
 
   // Queue state for reply submissions
   const [queueItemId, setQueueItemId] = useState<string | null>(null);
+
+  // Check if current user is a moderator
+  const isModerator =
+    userPublicKey && communityInfo?.moderators
+      ? checkIsModerator(userPublicKey, communityInfo.moderators)
+      : false;
 
   // Update selectedStatus when status prop changes
   useEffect(() => {
@@ -70,6 +84,11 @@ export const RequestDetailPage: React.FC = () => {
   const handleStatusChange = async (newStatus: string) => {
     if (!pool || !relays || !userPublicKey || !bunkerSigner) {
       setStatusError('Not connected to Nostr or missing bunker signer');
+      return;
+    }
+
+    if (!isModerator) {
+      setStatusError('Only moderators can change request status');
       return;
     }
 
@@ -286,7 +305,7 @@ export const RequestDetailPage: React.FC = () => {
                         setSelectedStatus(e.target.value);
                         handleStatusChange(e.target.value);
                       }}
-                      disabled={isUpdatingStatus}
+                      disabled={isUpdatingStatus || !isModerator}
                       className={`text-sm px-3 py-1 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${getStatusStyling(selectedStatus)}`}
                     >
                       {STATUS_OPTIONS.map((option: StatusOption) => (
@@ -297,6 +316,26 @@ export const RequestDetailPage: React.FC = () => {
                     </select>
                     {isUpdatingStatus && (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    )}
+                    {!isModerator && (
+                      <div className="group relative">
+                        <svg
+                          className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                          Only moderators may change request state
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -10,8 +10,10 @@ import {
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected } = useNostr();
-  const { requests, isLoading, error, refreshRequests } = useRequests();
+  const { isConnected, communityInfo } = useNostr();
+  const { requests, isLoading, error, refreshRequests } = useRequests(
+    communityInfo?.moderators || []
+  );
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
 
   // Auto-refresh requests when connected
@@ -29,18 +31,14 @@ export const DashboardPage: React.FC = () => {
     navigate('/request');
   };
 
-  const formatDate = (dateString: number) => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'Invalid date';
-    }
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const getAuthorDisplay = (pubkey: string) => {
