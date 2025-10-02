@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Event, SimplePool, UnsignedEvent } from 'nostr-tools';
 
 export interface UserMetadata {
@@ -41,6 +41,7 @@ export function useUserMetadata(
   const [temporaryUserName, setTemporaryUserName] = useState<string | null>(
     null
   );
+  const temporaryUserNameRef = useRef<string | null>(null);
 
   const parseMetadataEvent = useCallback(
     (event: Event): UserMetadata | null => {
@@ -91,9 +92,10 @@ export function useUserMetadata(
       // Query for user metadata event (kind 0)
       if (metadataEvents.length === 0) {
         // No metadata found, use temporary user name if available
-        if (temporaryUserName) {
+        const currentTemporaryUserName = temporaryUserNameRef.current;
+        if (currentTemporaryUserName) {
           const tempMetadata: UserMetadata = {
-            name: temporaryUserName,
+            name: currentTemporaryUserName,
             created_at: Math.floor(Date.now() / 1000),
           };
           setMetadata(tempMetadata);
@@ -104,7 +106,7 @@ export function useUserMetadata(
             const metadataEvent = {
               kind: 0,
               content: JSON.stringify({
-                name: temporaryUserName,
+                name: currentTemporaryUserName,
               }),
               created_at: Math.floor(Date.now() / 1000),
               pubkey: userPublicKey,
@@ -144,7 +146,6 @@ export function useUserMetadata(
     relays,
     userPublicKey,
     parseMetadataEvent,
-    temporaryUserName,
     submitEvent,
   ]);
 
@@ -154,6 +155,7 @@ export function useUserMetadata(
 
   const setTemporaryUserNameCallback = useCallback((name: string | null) => {
     setTemporaryUserName(name);
+    temporaryUserNameRef.current = name;
   }, []);
 
   const updateMetadata = useCallback(
@@ -209,15 +211,17 @@ export function useUserMetadata(
         setError('Failed to create or submit metadata event');
       }
     },
-    [isConnected, pool, relays, userPublicKey, submitEvent, metadata, isLoading]
+    [isConnected, pool, relays, userPublicKey]
   );
 
-  // Auto-fetch when connected and user public key is available
+  // Reset metadata when userPublicKey changes
   useEffect(() => {
-    if (isConnected && userPublicKey && !metadata) {
-      fetchMetadata();
-    }
-  }, [isConnected, userPublicKey, metadata, fetchMetadata]);
+    setMetadata(null);
+    setError(null);
+    setTemporaryUserName(null);
+    temporaryUserNameRef.current = null;
+    fetchMetadata();
+  }, [userPublicKey]);
 
   return {
     metadata,
