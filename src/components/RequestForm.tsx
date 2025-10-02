@@ -91,8 +91,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   // Render authenticated user form (simple controlled inputs)
   if (isAuthenticated) {
     const displayName = metadata?.name || metadata?.display_name || 'Anonymous';
-    const displayAbout =
-      metadata?.about || 'Product Designer and Community Volunteer';
+    const displayAbout = metadata?.about;
 
     return (
       <div className={isEmbed ? 'p-4' : ''}>
