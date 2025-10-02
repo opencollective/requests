@@ -38,7 +38,6 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   const [message, setMessage] = useState('');
 
   const isAuthenticated = !!userPublicKey;
-
   const {
     register,
     handleSubmit,
@@ -59,7 +58,6 @@ export const RequestForm: React.FC<RequestFormProps> = ({
 
   const handleAuthenticatedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!subject.trim() || !message.trim()) {
       return;
     }
@@ -70,7 +68,6 @@ export const RequestForm: React.FC<RequestFormProps> = ({
       subject: subject.trim(),
       message: message.trim(),
     };
-
     try {
       setError(null);
       await onSubmit(data);
@@ -150,29 +147,35 @@ export const RequestForm: React.FC<RequestFormProps> = ({
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              disabled={isSubmitting || !subject.trim() || !message.trim()}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Sending...' : 'Send'}
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                style={{ transform: 'rotate(45deg)' }}
+          {buttonReplacement ? (
+            <div className="pt-4 border-t border-gray-200">
+              {buttonReplacement}
+            </div>
+          ) : (
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <button
+                type="submit"
+                disabled={isSubmitting || !subject.trim() || !message.trim()}
+                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-            </button>
-          </div>
+                {isSubmitting ? 'Sending...' : 'Send'}
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  style={{ transform: 'rotate(45deg)' }}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </form>
       </div>
     );

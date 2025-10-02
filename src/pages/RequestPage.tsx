@@ -41,9 +41,10 @@ const RequestPage: React.FC = () => {
 
       // Add to event queue for later processing
       const newQueueItemId = submitEvent(eventData);
-
-      // This will submit to OpenBunker and handle authentication if needed
-      submitToOpenBunker(data);
+      if (!userPublicKey) {
+        // This will submit to OpenBunker and handle authentication if needed
+        submitToOpenBunker(data);
+      }
 
       // Show the queue item display instead of navigating
       setSubmittedQueueItemId(newQueueItemId);

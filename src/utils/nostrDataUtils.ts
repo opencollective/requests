@@ -4,7 +4,7 @@
  */
 
 import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
-import { getCommunityATagFromEnv } from './communityUtils';
+import { getCommunityATagFromEnv, getCommunityConfig } from './communityUtils';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import type { RequestData } from '../hooks/useRequests';
 
@@ -87,7 +87,7 @@ export const createCommunityRequestEvent = (
   userPublicKey?: string
 ): UnsignedEvent => {
   const communityATag = getCommunityATagFromEnv();
-
+  const { community_id } = getCommunityConfig();
   return {
     kind: 1111, // NIP-72: Community Request -> NIP-7D
     content: data.message,
@@ -96,6 +96,10 @@ export const createCommunityRequestEvent = (
       ['t', 'community-request'], // Topic tag
       ['title', data.subject],
       ['a', communityATag], // Community a tag
+      ['A', communityATag],
+      ['K', '34550'],
+      ['p', community_id],
+      ['P', community_id],
     ],
     created_at: Math.floor(Date.now() / 1000),
     pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not
