@@ -41,10 +41,6 @@ export const DashboardPage: React.FC = () => {
     });
   };
 
-  const getAuthorDisplay = (pubkey: string) => {
-    return pubkey.slice(0, 8) + '...' + pubkey.slice(-8);
-  };
-
   const getStatusStyling = (status: string) => {
     switch (status.toLowerCase()) {
       case 'new':
@@ -240,12 +236,13 @@ export const DashboardPage: React.FC = () => {
                       >
                         {request.status}
                       </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {getAuthorDisplay(request.author)}
-                      </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>From: {request.author}</span>
+                      <span className="truncate">
+                        {request.description.length > 100
+                          ? `${request.description.substring(0, 100)}...`
+                          : request.description}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 ml-4">
