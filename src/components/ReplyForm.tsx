@@ -25,11 +25,14 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     submitToOpenBunker,
     isOBAPISubmitting,
     error: openbunkerError,
+    setTemporaryUserName,
+    metadata,
   } = useNostr();
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(!userPublicKey);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,6 +48,15 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     try {
       if (userPublicKey) {
         // User is authenticated, proceed with normal flow
+
+        // Set temporary user name if provided and different from current metadata
+        if (
+          name.trim() &&
+          name.trim() !== (metadata?.name || metadata?.display_name)
+        ) {
+          setTemporaryUserName(name.trim());
+        }
+
         const replyEvent = createReplyEvent(requestId, requestPubkey, message);
 
         // Use submitEvent to add to queue instead of sending immediately
@@ -52,6 +64,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
 
         // Clear form and notify parent with the new event
         setMessage('');
+        setName('');
         onReplyAdded(replyEvent);
       } else {
         // User is not authenticated, need to collect email and submit to OpenBunker
@@ -63,7 +76,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
 
         // Create reply data for OpenBunker submission
         const replyData: RequestFormData = {
-          name: email.trim(),
+          name: name.trim() || email.trim(),
           email: email.trim(),
           subject: `Reply to request ${requestId}`,
           message: message.trim(),
@@ -83,6 +96,7 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
 
         setMessage('');
         setEmail('');
+        setName('');
         setShowEmailForm(false);
         onReplyAdded(replyEvent); // Notify parent with the new event
       }
@@ -116,9 +130,26 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           />
         </div>
 
-        {/* Email form for unauthenticated users */}
+        {/* Name and Email form for unauthenticated users */}
         {showEmailForm && !userPublicKey && (
           <div className="mb-3 space-y-3">
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your name (optional)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isSubmitting || isOBAPISubmitting}
+              />
+            </div>
             <div>
               <label
                 htmlFor="email"

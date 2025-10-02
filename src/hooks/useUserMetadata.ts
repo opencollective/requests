@@ -17,9 +17,11 @@ export interface UserMetadataState {
   metadata: UserMetadata | null;
   isLoading: boolean;
   error: string | null;
+  temporaryUserName: string | null;
   fetchMetadata: () => Promise<void>;
   refreshMetadata: () => Promise<void>;
-  updateMetadata: (newMetadata: Partial<UserMetadata>) => void;
+  updateMetadata: (_newMetadata: Partial<UserMetadata>) => void;
+  setTemporaryUserName: (_name: string | null) => void;
 }
 
 /**
@@ -36,6 +38,9 @@ export function useUserMetadata(
   const [metadata, setMetadata] = useState<UserMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [temporaryUserName, setTemporaryUserName] = useState<string | null>(
+    null
+  );
 
   const parseMetadataEvent = useCallback(
     (event: Event): UserMetadata | null => {
@@ -83,16 +88,34 @@ export function useUserMetadata(
         limit: 1,
       });
 
-      console.log('Metadata filter:', {
-        kinds: [0],
-        authors: [userPublicKey],
-        limit: 1,
-      });
-
-      console.log('Metadata events:', metadataEvents);
+      // Query for user metadata event (kind 0)
       if (metadataEvents.length === 0) {
-        setMetadata(null);
-        setError(null);
+        // No metadata found, use temporary user name if available
+        if (temporaryUserName) {
+          const tempMetadata: UserMetadata = {
+            name: temporaryUserName,
+            created_at: Math.floor(Date.now() / 1000),
+          };
+          setMetadata(tempMetadata);
+          setError(null);
+
+          // Create and submit metadata event with temporary name
+          if (submitEvent) {
+            const metadataEvent = {
+              kind: 0,
+              content: JSON.stringify({
+                name: temporaryUserName,
+              }),
+              created_at: Math.floor(Date.now() / 1000),
+              pubkey: userPublicKey,
+              tags: [],
+            };
+            submitEvent(metadataEvent);
+          }
+        } else {
+          setMetadata(null);
+          setError(null);
+        }
         return;
       }
 
@@ -115,11 +138,23 @@ export function useUserMetadata(
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, pool, relays, userPublicKey, parseMetadataEvent]);
+  }, [
+    isConnected,
+    pool,
+    relays,
+    userPublicKey,
+    parseMetadataEvent,
+    temporaryUserName,
+    submitEvent,
+  ]);
 
   const refreshMetadata = useCallback(async () => {
     await fetchMetadata();
   }, [fetchMetadata]);
+
+  const setTemporaryUserNameCallback = useCallback((name: string | null) => {
+    setTemporaryUserName(name);
+  }, []);
 
   const updateMetadata = useCallback(
     (newMetadata: Partial<UserMetadata>) => {
@@ -133,19 +168,32 @@ export function useUserMetadata(
         return;
       }
 
+      // Only update if we have fetched metadata at least once (metadata !== null)
+      // This ensures we don't update before the initial fetch is complete
+      if (metadata === null && !isLoading) {
+        setError('Cannot update metadata: initial metadata fetch not complete');
+        return;
+      }
+
       try {
-        // Create the new metadata event
+        // Create the new metadata event, preserving existing values
+        const currentMetadata = metadata || {};
+        const updatedMetadata = {
+          ...currentMetadata,
+          ...newMetadata,
+        };
+
         const metadataEvent = {
           kind: 0,
           content: JSON.stringify({
-            name: newMetadata.name,
-            display_name: newMetadata.display_name,
-            about: newMetadata.about,
-            picture: newMetadata.picture,
-            banner: newMetadata.banner,
-            website: newMetadata.website,
-            lud16: newMetadata.lud16,
-            nip05: newMetadata.nip05,
+            name: updatedMetadata.name,
+            display_name: updatedMetadata.display_name,
+            about: updatedMetadata.about,
+            picture: updatedMetadata.picture,
+            banner: updatedMetadata.banner,
+            website: updatedMetadata.website,
+            lud16: updatedMetadata.lud16,
+            nip05: updatedMetadata.nip05,
           }),
           created_at: Math.floor(Date.now() / 1000),
           pubkey: userPublicKey,
@@ -153,9 +201,7 @@ export function useUserMetadata(
         };
 
         // Update local state immediately for better UX
-        setMetadata(prev =>
-          prev ? { ...prev, ...newMetadata } : (newMetadata as UserMetadata)
-        );
+        setMetadata(updatedMetadata);
 
         // Submit the event for signing and publishing
         submitEvent(metadataEvent);
@@ -163,7 +209,7 @@ export function useUserMetadata(
         setError('Failed to create or submit metadata event');
       }
     },
-    [isConnected, pool, relays, userPublicKey, submitEvent]
+    [isConnected, pool, relays, userPublicKey, submitEvent, metadata, isLoading]
   );
 
   // Auto-fetch when connected and user public key is available
@@ -177,8 +223,10 @@ export function useUserMetadata(
     metadata,
     isLoading,
     error,
+    temporaryUserName,
     fetchMetadata,
     refreshMetadata,
     updateMetadata,
+    setTemporaryUserName: setTemporaryUserNameCallback,
   };
 }

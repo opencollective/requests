@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { requestFormSchema } from '../types/RequestFormSchema';
+import { useNostr } from '../hooks/useNostr';
 
 interface UserMetadata {
   name?: string;
@@ -32,6 +33,7 @@ export const RequestForm: React.FC<RequestFormProps> = ({
   buttonReplacement,
 }) => {
   const [error, setError] = useState<string | null>(null);
+  const { setTemporaryUserName, temporaryUserName } = useNostr();
 
   // State for authenticated users (controlled inputs)
   const [subject, setSubject] = useState('');
@@ -49,6 +51,12 @@ export const RequestForm: React.FC<RequestFormProps> = ({
 
   const handleFormSubmit = async (formData: RequestFormData) => {
     try {
+      if (
+        formData.name.trim() &&
+        formData.name.trim() !== (metadata?.name || metadata?.display_name)
+      ) {
+        setTemporaryUserName(formData.name.trim());
+      }
       setError(null);
       await onSubmit(formData);
     } catch (err) {
@@ -63,7 +71,11 @@ export const RequestForm: React.FC<RequestFormProps> = ({
     }
 
     const data: RequestFormData = {
-      name: metadata?.name || metadata?.display_name || 'Anonymous User',
+      name:
+        metadata?.name ||
+        metadata?.display_name ||
+        temporaryUserName ||
+        'Anonymous User',
       email: '', // Email not required for authenticated users
       subject: subject.trim(),
       message: message.trim(),
