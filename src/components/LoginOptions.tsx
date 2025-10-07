@@ -304,9 +304,11 @@ export const LoginOptions: React.FC = () => {
                   <summary className="cursor-pointer text-sm font-medium">
                     View Bunker Connection Token
                   </summary>
-                  <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
-                    {bunkerToken}
-                  </pre>
+                  <div className="mt-2 p-3 bg-gray-100 rounded border max-w-full">
+                    <code className="text-xs break-all whitespace-normal font-mono text-gray-700 block">
+                      {bunkerToken}
+                    </code>
+                  </div>
                 </details>
               )}
             </div>
