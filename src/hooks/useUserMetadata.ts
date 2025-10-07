@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Event, SimplePool, UnsignedEvent } from 'nostr-tools';
 
 export interface UserMetadata {
@@ -41,7 +41,6 @@ export function useUserMetadata(
   const [temporaryUserName, setTemporaryUserName] = useState<string | null>(
     null
   );
-  const temporaryUserNameRef = useRef<string | null>(null);
 
   const parseMetadataEvent = useCallback(
     (event: Event): UserMetadata | null => {
@@ -92,10 +91,9 @@ export function useUserMetadata(
       // Query for user metadata event (kind 0)
       if (metadataEvents.length === 0) {
         // No metadata found, use temporary user name if available
-        const currentTemporaryUserName = temporaryUserNameRef.current;
-        if (currentTemporaryUserName) {
+        if (temporaryUserName) {
           const tempMetadata: UserMetadata = {
-            name: currentTemporaryUserName,
+            name: temporaryUserName,
             created_at: Math.floor(Date.now() / 1000),
           };
           setMetadata(tempMetadata);
@@ -106,7 +104,7 @@ export function useUserMetadata(
             const metadataEvent = {
               kind: 0,
               content: JSON.stringify({
-                name: currentTemporaryUserName,
+                name: temporaryUserName,
               }),
               created_at: Math.floor(Date.now() / 1000),
               pubkey: userPublicKey,
@@ -115,9 +113,11 @@ export function useUserMetadata(
             submitEvent(metadataEvent);
           }
         } else {
+          console.log('No temporary user name found, setting metadata to null');
           setMetadata(null);
           setError(null);
         }
+        setTemporaryUserName(null);
         return;
       }
 
@@ -147,6 +147,7 @@ export function useUserMetadata(
     userPublicKey,
     parseMetadataEvent,
     submitEvent,
+    temporaryUserName,
   ]);
 
   const refreshMetadata = useCallback(async () => {
@@ -155,7 +156,6 @@ export function useUserMetadata(
 
   const setTemporaryUserNameCallback = useCallback((name: string | null) => {
     setTemporaryUserName(name);
-    temporaryUserNameRef.current = name;
   }, []);
 
   const updateMetadata = useCallback(
@@ -218,8 +218,6 @@ export function useUserMetadata(
   useEffect(() => {
     setMetadata(null);
     setError(null);
-    setTemporaryUserName(null);
-    temporaryUserNameRef.current = null;
     fetchMetadata();
   }, [userPublicKey]);
 
