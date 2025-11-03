@@ -97,6 +97,7 @@ export const createCommunityRequestEvent = (
       ['title', data.subject],
       ['a', communityATag], // Community a tag
       ['A', communityATag],
+      ['k', '34550'],
       ['K', '34550'],
       ['p', community_id],
       ['P', community_id],
