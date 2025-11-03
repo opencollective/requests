@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
+import { EventRawDataPage } from './pages/EventRawDataPage';
 import RequestPage from './pages/RequestPage';
 import QueueItemPage from './pages/QueueItemPage';
 import './index.css';
@@ -30,6 +31,7 @@ function App() {
               element={<RequestDetailPage />}
             />
             <Route path="/queue/:queueItemId" element={<QueueItemPage />} />
+            <Route path="/event/:nevent" element={<EventRawDataPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { nip19 } from 'nostr-tools';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
@@ -45,6 +46,9 @@ export const RequestDetailPage: React.FC = () => {
   // Queue state for reply submissions
   const [queueItemId, setQueueItemId] = useState<string | null>(null);
 
+  // Dropdown state for settings menu
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+
   // Check if current user is a moderator
   const isModerator =
     userPublicKey && communityInfo?.moderators
@@ -80,6 +84,23 @@ export const RequestDetailPage: React.FC = () => {
       fetchMetadataForPubkey(pubkey);
     });
   }, [request, thread, statusEvents, fetchMetadataForPubkey]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.settings-dropdown-container')) {
+        setShowSettingsDropdown(false);
+      }
+    };
+
+    if (showSettingsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showSettingsDropdown]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!pool || !relays || !userPublicKey || !bunkerSigner) {
@@ -210,6 +231,21 @@ export const RequestDetailPage: React.FC = () => {
     return allEvents;
   };
 
+  // Encode the request event ID as a nevent for the raw data page
+  // This must be called before any early returns to follow Rules of Hooks
+  const neventUrl = useMemo(() => {
+    if (!request) return null;
+    try {
+      const nevent = nip19.neventEncode({
+        id: request.id,
+        relays: relays || [],
+      });
+      return `/event/${encodeURIComponent(nevent)}`;
+    } catch {
+      return null;
+    }
+  }, [request, relays]);
+
   if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -288,6 +324,52 @@ export const RequestDetailPage: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Request Details
             </h1>
+            {neventUrl && (
+              <div className="settings-dropdown-container relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Settings"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </button>
+                {showSettingsDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSettingsDropdown(false);
+                          navigate(neventUrl);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        View raw event data
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Main Request */}
