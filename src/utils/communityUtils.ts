@@ -2,6 +2,7 @@
  * Community utilities for NIP-72 implementation
  */
 
+import { type Event } from 'nostr-tools';
 /**
  * Creates a community a tag according to NIP-72 specification
  * Format: 34550:community_id:community_identifier
@@ -47,4 +48,13 @@ export const getCommunityATagFromEnv = (): string => {
     return '';
   }
   return getCommunityATag(community_id, community_identifier);
+};
+
+/**
+ * Extracts the community a tag from an event
+ * @param event - The event to extract from
+ * @returns The community a tag or empty string
+ */
+export const extractCommunityATag = (event: Event): string => {
+  return event.tags.find(tag => tag[0] === 'a')?.[1] || '';
 };

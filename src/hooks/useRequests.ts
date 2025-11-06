@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
-import {
-  createCommunityRequestFilterFromEnv,
-  processCommunityRequestEvents,
-} from '../utils/nostrDataUtils';
+import { processCommunityRequestEvents } from '../utils/nostrDataUtils';
+import { createCommunityRequestFilterFromEnv } from '../utils/communityRequest';
 import {
   createStatusEventFilter,
   getLatestRequestStatus,

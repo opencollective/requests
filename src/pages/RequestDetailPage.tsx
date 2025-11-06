@@ -15,8 +15,13 @@ import {
   isModerator as checkIsModerator,
   type StatusOption,
 } from '../utils/statusEventUtils.ts';
+import {
+  getLatestReplaceableEvent,
+  hasBeenEdited,
+} from '../utils/editEventUtils';
 import { getCommunityATagFromEnv } from '../utils/communityUtils';
 import { type Event } from 'nostr-tools';
+import { EditForm } from '../components/EditForm';
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
@@ -29,8 +34,16 @@ export const RequestDetailPage: React.FC = () => {
     bunkerSigner,
     communityInfo,
   } = useNostr();
-  const { request, thread, status, statusEvents, isLoading, error, refetch } =
-    useRequestDetails(requestId, communityInfo?.moderators || []);
+  const {
+    request,
+    thread,
+    status,
+    statusEvents,
+    allEvents,
+    isLoading,
+    error,
+    refetch,
+  } = useRequestDetails(requestId, communityInfo?.moderators || []);
   const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
     isConnected,
     pool,
@@ -48,6 +61,9 @@ export const RequestDetailPage: React.FC = () => {
 
   // Dropdown state for settings menu
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+
+  // Edit state
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   // Check if current user is a moderator
   const isModerator =
@@ -175,11 +191,19 @@ export const RequestDetailPage: React.FC = () => {
     return getStatusColor(status);
   };
 
+  // Helper function to get the latest version of an event (original or edited)
+  const getLatestEvent = (originalEvent: Event): Event => {
+    if (!allEvents) return originalEvent;
+    return getLatestReplaceableEvent(allEvents, originalEvent);
+  };
+
   const parseRequestContent = (request: Event) => {
+    // Get the latest version of the event (may be edited)
+    const latestEvent = getLatestEvent(request);
     return {
-      subject: request.tags.find(tag => tag[0] === 'title')?.[1] || '',
-      message: request.content,
-      name: getDisplayName(request.pubkey),
+      subject: latestEvent.tags.find(tag => tag[0] === 'title')?.[1] || '',
+      message: latestEvent.content,
+      name: getDisplayName(latestEvent.pubkey),
       email: '',
     };
   };
@@ -205,6 +229,17 @@ export const RequestDetailPage: React.FC = () => {
     }
   };
 
+  // Helper function to get display content (original or edited)
+  const getDisplayContent = (event: Event): string => {
+    const latestEvent = getLatestEvent(event);
+    return latestEvent.content;
+  };
+
+  // Helper function to check if user can edit an event
+  const canEditEvent = (event: Event): boolean => {
+    return userPublicKey !== null && event.pubkey === userPublicKey;
+  };
+
   // Merge status events with thread events for chronological display
   const getMergedThreadEvents = () => {
     // Convert status events to a format compatible with thread display
@@ -216,12 +251,13 @@ export const RequestDetailPage: React.FC = () => {
     }));
 
     // Convert regular thread events
-    const regularThreadEvents = thread
-      .slice(1)
-      .map((event: Event & { level: number; isRoot: boolean }) => ({
+    const regularThreadEvents = thread.slice(1).map(event => {
+      const eventWithEdit = event as unknown as Event & { isEdit: boolean };
+      return {
         ...event,
-        type: 'reply' as const,
-      }));
+        type: eventWithEdit.isEdit ? ('edit' as const) : ('reply' as const),
+      };
+    });
 
     // Merge and sort by creation time
     const allEvents = [...statusThreadEvents, ...regularThreadEvents].sort(
@@ -437,9 +473,53 @@ export const RequestDetailPage: React.FC = () => {
             </div>
 
             <div className="prose max-w-none">
-              <p className="text-gray-700 whitespace-pre-wrap">
-                {requestContent.message}
-              </p>
+              {editingEventId === request.id ? (
+                <EditForm
+                  originalContent={getDisplayContent(request)}
+                  originalEvent={getLatestEvent(request)}
+                  originalTitle={requestContent.subject}
+                  onEditSubmitted={() => {
+                    setEditingEventId(null);
+                    refetch();
+                  }}
+                  onCancel={() => setEditingEventId(null)}
+                />
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <p className="text-gray-700 whitespace-pre-wrap flex-1">
+                      {getDisplayContent(request)}
+                    </p>
+                    {canEditEvent(request) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingEventId(request.id)}
+                        className="ml-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Edit request"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {allEvents && hasBeenEdited(allEvents, request) && (
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      (Edited)
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Status Messages */}
@@ -506,11 +586,46 @@ export const RequestDetailPage: React.FC = () => {
                         </p>
                       </div>
                     );
+                  } else if (event.type === 'edit') {
+                    // Display edit indicator (only showing that there is an edit)
+                    return (
+                      <div
+                        key={event.id}
+                        className="border-l-4 border-gray-300 pl-4 py-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                          <span>
+                            Request edited by {getDisplayName(event.pubkey)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(event.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    );
                   } else {
                     // Display regular reply
-                    const content = parseContent(event.content);
+                    const latestEvent = getLatestEvent(event);
+                    const displayContent = getDisplayContent(event);
+                    const parsedContent = parseContent(displayContent);
                     const indentLevel = event.level;
                     const displayName = getDisplayName(event.pubkey);
+                    const isBeingEdited = editingEventId === event.id;
+                    const hasEdit =
+                      allEvents && hasBeenEdited(allEvents, event);
 
                     return (
                       <div
@@ -525,14 +640,53 @@ export const RequestDetailPage: React.FC = () => {
                                 {displayName}
                               </span>
                               <span className="text-sm text-gray-500">
-                                {formatDate(event.created_at)}
+                                {formatDate(latestEvent.created_at)}
                               </span>
+                              {hasEdit && (
+                                <span className="text-xs text-gray-400 italic">
+                                  (Edited)
+                                </span>
+                              )}
                             </span>
                           </div>
+                          {canEditEvent(event) && !isBeingEdited && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingEventId(event.id)}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Edit reply"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          )}
                         </div>
-                        <p className="text-gray-700 whitespace-pre-wrap">
-                          {content.message}
-                        </p>
+                        {isBeingEdited ? (
+                          <EditForm
+                            originalContent={getDisplayContent(event)}
+                            originalEvent={latestEvent}
+                            onEditSubmitted={() => {
+                              setEditingEventId(null);
+                              refetch();
+                            }}
+                            onCancel={() => setEditingEventId(null)}
+                          />
+                        ) : (
+                          <p className="text-gray-700 whitespace-pre-wrap">
+                            {parsedContent.message}
+                          </p>
+                        )}
                       </div>
                     );
                   }

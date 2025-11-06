@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNostr } from '../hooks/useNostr';
 import { type UnsignedEvent } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
-import { createReplyEvent } from '../utils/nostrDataUtils';
+import { createReplyEvent } from '../utils/replies';
 
 interface ReplyFormProps {
   requestId: string;

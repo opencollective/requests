@@ -3,13 +3,13 @@ import { useNostr } from './useNostr';
 import type { Event, Filter } from 'nostr-tools';
 import {
   createEventByIdFilter,
-  createThreadFilter,
   processThreadEvents,
 } from '../utils/nostrDataUtils';
 import {
   createStatusEventFilter,
   getLatestRequestStatus,
 } from '../utils/statusEventUtils';
+import { createThreadFilter } from '../utils/replies';
 
 const relays = [
   'wss://relay.chorus.community',
@@ -27,6 +27,7 @@ export interface RequestDetails {
   thread: ThreadEvent[];
   status: string;
   statusEvents: Event[];
+  allEvents: Event[];
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
@@ -111,14 +112,16 @@ export function useRequestDetails(
 
     if (uniqueEvents.length === 0) return;
 
-    // Separate status events from other events
-    const statusEvents = uniqueEvents.filter(event => event.kind === 9078);
+    // Separate status events and other events
+    const statusEventsFiltered = uniqueEvents.filter(
+      event => event.kind === 9078
+    );
     const otherEvents = uniqueEvents.filter(event => event.kind !== 9078);
 
     // Update status events state (already filtered by moderators at query level)
-    setStatusEvents(statusEvents);
+    setStatusEvents(statusEventsFiltered);
 
-    // Find the main request
+    // Find the main request (could be the original or a replacement)
     const mainRequest = otherEvents.find(event => event.id === requestId);
     if (mainRequest) {
       setRequest(mainRequest);
@@ -154,6 +157,7 @@ export function useRequestDetails(
     thread,
     status,
     statusEvents,
+    allEvents: events, // Return all events for finding replaceable events
     isLoading,
     error,
     refetch: fetchRequestDetails,

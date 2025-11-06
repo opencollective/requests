@@ -4,7 +4,7 @@ import { useNostr } from '../hooks/useNostr';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
-import { createCommunityRequestEvent } from '../utils/nostrDataUtils';
+import { createCommunityRequestEvent } from '../utils/communityRequest';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();

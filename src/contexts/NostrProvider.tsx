@@ -4,26 +4,13 @@ import {
   getPublicKey,
   type Event,
   type UnsignedEvent,
-  type VerifiedEvent,
 } from 'nostr-tools';
-import {
-  useNostrConnectionState,
-  type NostrConnectionState,
-} from '../hooks/useNostrConnectionState';
-import {
-  useBunkerAuthState,
-  type BunkerAuthState,
-} from '../hooks/useBunkerAuthState';
-import { useEventQueue, type EventQueueState } from '../hooks/useEventQueue';
-import {
-  useCommunityEvent,
-  type CommunityEventState,
-} from '../hooks/useCommunityEvent';
-import {
-  useUserMetadata,
-  type UserMetadataState,
-} from '../hooks/useUserMetadata';
-import { NostrContext } from './NostrContext';
+import { useNostrConnectionState } from '../hooks/useNostrConnectionState';
+import { useBunkerAuthState } from '../hooks/useBunkerAuthState';
+import { useEventQueue } from '../hooks/useEventQueue';
+import { useCommunityEvent } from '../hooks/useCommunityEvent';
+import { useUserMetadata } from '../hooks/useUserMetadata';
+import { NostrContext, type NostrContextType } from './NostrContext';
 import {
   bunkerSignerfromURI,
   createNostrConnectURI,
@@ -34,37 +21,6 @@ import {
   type OpenBunkerResponse,
 } from '../api/openbunker';
 import type { RequestFormData } from '../types/RequestFormSchema';
-
-// Callbacks for authenticated operations
-export interface AuthenticatedCallbacks {
-  logout: () => Promise<void>;
-  sendVerifiedEvent: (event: VerifiedEvent) => Promise<Event>;
-  submitEvent: (event: UnsignedEvent) => string; // Returns the queue item ID
-}
-
-export interface NostrContextType
-  extends NostrConnectionState,
-    BunkerAuthState,
-    EventQueueState,
-    CommunityEventState,
-    UserMetadataState,
-    AuthenticatedCallbacks {
-  // Computed aggregated nostr status for display
-  popup: Window | null;
-  isConfigured: boolean;
-  userPublicKey: string | null;
-  // API flow
-  submitToOpenBunker: (data: RequestFormData) => Promise<void>;
-  confirmBunkerConnection: (secret: string) => Promise<void>;
-  // Nostr connect flow
-  configureBunkerConnectionWithNostrConnect: () => Promise<void>;
-  configureBunkerConnectionWithBunkerToken: () => Promise<void>;
-  isOBAPISubmitting: boolean;
-  isWaitingForConfirmation: boolean;
-  email: string | null;
-  error: string | null;
-  lastResponse: OpenBunkerResponse | null;
-}
 
 export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Use custom hooks for different state management
