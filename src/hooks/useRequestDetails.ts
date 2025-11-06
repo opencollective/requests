@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNostr } from './useNostr';
 import type { Event, Filter } from 'nostr-tools';
 import {
@@ -10,6 +10,7 @@ import {
   getLatestRequestStatus,
 } from '../utils/statusEventUtils';
 import { createThreadFilter } from '../utils/replies';
+import { createReactionFilter } from '../utils/reactionUtils';
 
 const relays = [
   'wss://relay.chorus.community',
@@ -27,6 +28,7 @@ export interface RequestDetails {
   thread: ThreadEvent[];
   status: string;
   statusEvents: Event[];
+  reactions: Event[]; // Reaction events (kind 7)
   allEvents: Event[];
   isLoading: boolean;
   error: string | null;
@@ -45,6 +47,17 @@ export function useRequestDetails(
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [statusEvents, setStatusEvents] = useState<Event[]>([]);
+  const [reactions, setReactions] = useState<Event[]>([]);
+
+  // Store moderators in a ref to use in callbacks without causing re-renders
+  const moderatorsRef = useRef(moderators);
+  useEffect(() => {
+    moderatorsRef.current = moderators;
+  }, [moderators]);
+
+  // Track active subscriptions to close them when refetching
+  const subscriptionsRef = useRef<Array<() => void>>([]);
+  const isFetchingRef = useRef(false);
 
   // Subscribe to events for a specific request
   const subscribeToRequestEvents = useCallback(
@@ -82,27 +95,51 @@ export function useRequestDetails(
   const fetchRequestDetails = useCallback(() => {
     if (!requestId || !pool || !isConnected) return;
 
+    // Prevent multiple simultaneous fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    // Close existing subscriptions
+    subscriptionsRef.current.forEach(close => close());
+    subscriptionsRef.current = [];
+
     setIsLoading(true);
     setError(null);
-    setEvents([]);
-    setStatusEvents([]);
+    // Don't clear events - let subscriptions add new ones incrementally
 
     try {
       // First, fetch the main request
-      subscribeToRequestEvents(createEventByIdFilter(requestId));
+      const sub1 = subscribeToRequestEvents(createEventByIdFilter(requestId));
+      if (sub1) subscriptionsRef.current.push(sub1);
 
       // Then fetch the thread (replies and related events)
-      subscribeToRequestEvents(createThreadFilter(requestId, 100));
+      const sub2 = subscribeToRequestEvents(createThreadFilter(requestId, 100));
+      if (sub2) subscriptionsRef.current.push(sub2);
 
       // Fetch status events for this specific request (filtered by moderators)
-      subscribeToRequestEvents(
-        createStatusEventFilter(requestId, undefined, moderators, 100)
+      const sub3 = subscribeToRequestEvents(
+        createStatusEventFilter(
+          requestId,
+          undefined,
+          moderatorsRef.current,
+          100
+        )
       );
+      if (sub3) subscriptionsRef.current.push(sub3);
+
+      // Fetch reaction events for this specific request
+      const sub4 = subscribeToRequestEvents(
+        createReactionFilter(requestId, 100)
+      );
+      if (sub4) subscriptionsRef.current.push(sub4);
+
+      isFetchingRef.current = false;
     } catch {
       setError('Failed to fetch request details');
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [requestId, pool, isConnected, subscribeToRequestEvents, moderators]);
+  }, [requestId, pool, isConnected, subscribeToRequestEvents]);
 
   // Process events into request and thread
   useEffect(() => {
@@ -110,53 +147,113 @@ export function useRequestDetails(
       (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
     );
 
-    if (uniqueEvents.length === 0) return;
+    if (uniqueEvents.length === 0) {
+      // Only set loading to false if we have a requestId but no events yet
+      if (requestId && !request) {
+        setIsLoading(false);
+      }
+      return;
+    }
 
-    // Separate status events and other events
+    // Separate status events, reaction events, and other events
     const statusEventsFiltered = uniqueEvents.filter(
       event => event.kind === 9078
     );
-    const otherEvents = uniqueEvents.filter(event => event.kind !== 9078);
+    const reactionEventsFiltered = uniqueEvents.filter(
+      event => event.kind === 7
+    );
+    const otherEvents = uniqueEvents.filter(
+      event => event.kind !== 9078 && event.kind !== 7
+    );
 
-    // Update status events state (already filtered by moderators at query level)
-    setStatusEvents(statusEventsFiltered);
+    // Only update status events if they actually changed (compare by IDs)
+    setStatusEvents(prev => {
+      const prevIds = new Set(prev.map(e => e.id));
+      const newIds = new Set(statusEventsFiltered.map(e => e.id));
+      if (
+        prevIds.size !== newIds.size ||
+        ![...prevIds].every(id => newIds.has(id))
+      ) {
+        return statusEventsFiltered;
+      }
+      return prev;
+    });
+
+    // Only update reaction events if they actually changed (compare by IDs)
+    setReactions(prev => {
+      const prevIds = new Set(prev.map(e => e.id));
+      const newIds = new Set(reactionEventsFiltered.map(e => e.id));
+      if (
+        prevIds.size !== newIds.size ||
+        ![...prevIds].every(id => newIds.has(id))
+      ) {
+        return reactionEventsFiltered;
+      }
+      return prev;
+    });
 
     // Find the main request (could be the original or a replacement)
     const mainRequest = otherEvents.find(event => event.id === requestId);
     if (mainRequest) {
-      setRequest(mainRequest);
+      setRequest(prev => {
+        // Only update if it's actually different
+        if (!prev || prev.id !== mainRequest.id) {
+          return mainRequest;
+        }
+        return prev;
+      });
     }
 
     // Process thread events using the utility function
     if (requestId) {
       const threadEvents = processThreadEvents(otherEvents, requestId);
-      setThread(threadEvents);
+      setThread(prev => {
+        // Only update if thread actually changed (compare by IDs)
+        const prevIds = new Set(prev.map(e => e.id));
+        const newIds = new Set(threadEvents.map(e => e.id));
+        if (
+          prevIds.size !== newIds.size ||
+          ![...prevIds].every(id => newIds.has(id))
+        ) {
+          return threadEvents;
+        }
+        return prev;
+      });
     }
     setIsLoading(false);
-  }, [events, requestId]);
+  }, [events, requestId, request]);
 
   // Update status when status events change
   useEffect(() => {
     if (requestId && statusEvents.length > 0) {
       const latestStatus = getLatestRequestStatus(statusEvents, requestId);
       if (latestStatus) {
-        setStatus(latestStatus);
+        setStatus(prev => (prev !== latestStatus ? latestStatus : prev));
       }
     } else if (requestId) {
-      setStatus('New');
+      setStatus(prev => (prev !== 'New' ? 'New' : prev));
     }
   }, [statusEvents, requestId]);
 
   // Initial fetch when requestId changes
   useEffect(() => {
-    fetchRequestDetails();
-  }, [fetchRequestDetails]);
+    if (requestId) {
+      fetchRequestDetails();
+    }
+    // Cleanup subscriptions on unmount or requestId change
+    return () => {
+      subscriptionsRef.current.forEach(close => close());
+      subscriptionsRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestId]); // Only depend on requestId to avoid infinite loops
 
   return {
     request,
     thread,
     status,
     statusEvents,
+    reactions,
     allEvents: events, // Return all events for finding replaceable events
     isLoading,
     error,

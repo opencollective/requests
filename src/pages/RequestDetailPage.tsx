@@ -6,6 +6,7 @@ import { useRequestDetails } from '../hooks/useRequestDetails';
 import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
 import { ReplyForm } from '../components/ReplyForm';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
+import { ReactionsDisplay } from '../components/ReactionButton';
 import {
   createStatusEvent,
   STATUS_OPTIONS,
@@ -521,6 +522,19 @@ export const RequestDetailPage: React.FC = () => {
                 </>
               )}
             </div>
+
+            {/* Reactions */}
+            {request && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <ReactionsDisplay
+                  requestId={request.id}
+                  requestPubkey={request.pubkey}
+                  allEvents={allEvents}
+                  userPublicKey={userPublicKey}
+                  onReactionAdded={refetch}
+                />
+              </div>
+            )}
 
             {/* Status Messages */}
             {statusError && (
