@@ -1,58 +1,39 @@
-import { useNostr } from '../hooks/useNostr';
-import { getCommunityATagFromEnv } from '../utils/communityUtils';
+import { getCommunityATag, parseCommunityId } from '../utils/communityUtils';
+import type { CommunityInfo as CommunityInfoType } from '../utils/communityUtils';
+
+interface CommunityInfoProps {
+  communityInfo: CommunityInfoType;
+  refreshCommunity?: () => void | Promise<void>;
+  communityId?: string; // Optional communityId from URL for generating a tag
+}
 
 /**
- * Example component demonstrating how to use the community event hook
- * This component displays information about the configured Nostr community
+ * Component displaying information about a Nostr community
  */
-export function CommunityInfo() {
-  const { communityInfo, isLoading, error, fetchCommunity, refreshCommunity } =
-    useNostr();
+export function CommunityInfo({
+  communityInfo,
+  refreshCommunity,
+  communityId,
+}: CommunityInfoProps) {
+  // Generate community a tag from URL or use communityInfo
+  const getCommunityATagForDisplay = () => {
+    if (communityId) {
+      const parsed = parseCommunityId(communityId);
+      if (parsed) {
+        return getCommunityATag(
+          parsed.community_id,
+          parsed.community_identifier
+        );
+      }
+    }
+    // Fallback: try to construct from communityInfo
+    if (communityInfo.pubkey && communityInfo.identifier) {
+      return getCommunityATag(communityInfo.pubkey, communityInfo.identifier);
+    }
+    return null;
+  };
 
-  if (isLoading) {
-    return (
-      <div className="p-4 border rounded-lg">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-        <h3 className="text-red-800 font-medium">Community Error</h3>
-        <p className="text-red-600 text-sm mt-1">{error}</p>
-        <button
-          type="button"
-          onClick={fetchCommunity}
-          className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!communityInfo) {
-    return (
-      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <h3 className="text-gray-800 font-medium">No Community Found</h3>
-        <p className="text-gray-600 text-sm mt-1">
-          No community information available. Check your environment variables.
-        </p>
-        <button
-          type="button"
-          onClick={fetchCommunity}
-          className="mt-2 px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
-        >
-          Load Community
-        </button>
-      </div>
-    );
-  }
+  const communityATag = getCommunityATagForDisplay();
 
   return (
     <div className="p-4 border rounded-lg bg-white">
@@ -60,13 +41,15 @@ export function CommunityInfo() {
         <h3 className="text-lg font-semibold text-gray-900">
           {communityInfo.name}
         </h3>
-        <button
-          type="button"
-          onClick={refreshCommunity}
-          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-        >
-          Refresh
-        </button>
+        {refreshCommunity && (
+          <button
+            type="button"
+            onClick={refreshCommunity}
+            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+          >
+            Refresh
+          </button>
+        )}
       </div>
 
       {communityInfo.image && (
@@ -80,10 +63,10 @@ export function CommunityInfo() {
       <p className="text-gray-700 text-sm mb-3">{communityInfo.description}</p>
 
       {/* Chorus Community Link */}
-      {getCommunityATagFromEnv() && (
+      {communityATag && (
         <div className="mb-3">
           <a
-            href={`https://chorus.community/group/${encodeURIComponent(getCommunityATagFromEnv())}`}
+            href={`https://chorus.community/group/${encodeURIComponent(communityATag)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center px-3 py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors text-sm font-medium"

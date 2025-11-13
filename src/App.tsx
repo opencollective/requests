@@ -8,6 +8,7 @@ import { NostrProvider } from './contexts/NostrProvider';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CommunityPage } from './pages/CommunityPage';
+import { CommunitiesPage } from './pages/CommunitiesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import { EventRawDataPage } from './pages/EventRawDataPage';
@@ -23,7 +24,12 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/community" element={<CommunityPage />} />
+            <Route
+              path="/community/:communityId/dashboard"
+              element={<DashboardPage />}
+            />
+            <Route path="/community/:communityId" element={<CommunityPage />} />
+            <Route path="/communities" element={<CommunitiesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/request" element={<RequestPage />} />
             <Route

@@ -17,7 +17,11 @@ export interface RequestData {
   status: string;
 }
 
-export function useRequests(moderators: string[] = []) {
+export function useRequests(
+  moderators: string[] = [],
+  overrideCommunityId?: string,
+  overrideIdentifier?: string
+) {
   const { isConnected, pool, relays } = useNostr();
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +39,11 @@ export function useRequests(moderators: string[] = []) {
       // Query for community request events (kind 1111)
       const requestEvents = await pool.querySync(
         relays,
-        createCommunityRequestFilterFromEnv(100)
+        createCommunityRequestFilterFromEnv(
+          100,
+          overrideCommunityId,
+          overrideIdentifier
+        )
       );
       setEvents(requestEvents);
 
@@ -51,7 +59,14 @@ export function useRequests(moderators: string[] = []) {
       setError('Failed to fetch requests');
       setIsLoading(false);
     }
-  }, [isConnected, pool, relays, moderators]);
+  }, [
+    isConnected,
+    pool,
+    relays,
+    moderators,
+    overrideCommunityId,
+    overrideIdentifier,
+  ]);
 
   const refreshRequests = useCallback(() => {
     fetchRequests();
