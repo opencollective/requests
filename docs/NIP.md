@@ -27,12 +27,6 @@ This document describes which Nostr Implementation Possibilities (NIPs) the Comm
 - **Implementation**: Used in `src/pages/EventRawDataPage.tsx` for decoding event references
 - **Reference**: [NIP-19](https://github.com/nostr-protocol/nips/blob/master/19.md)
 
-#### NIP-23: Long-form content
-
-- **Usage**: Previously used for storing requests (kind 30023)
-- **Status**: Deprecated in favor of NIP-72 community requests (kind 1111)
-- **Reference**: [NIP-23](https://github.com/nostr-protocol/nips/blob/master/23.md)
-
 ### Authentication & Security Standards
 
 #### NIP-46: Nostr Remote Signing
@@ -82,87 +76,11 @@ Based on NIP standards and custom implementations:
 
 ### Status Events (Kind 9078)
 
-A custom event type for tracking the status of community requests independently from the request itself.
-
-**Event Structure:**
-
-```typescript
-{
-  kind: 9078,
-  content: string, // Descriptive text (e.g., "Status updated to: approved")
-  tags: [
-    ['d', string],     // Event ID of the original request being referenced
-    ['status', string], // Status value (new, in-progress, rejected, completed)
-    ['a', string]      // Community reference (optional)
-  ]
-}
-```
-
-**Features:**
-
-- Decoupled status tracking from request content
-- Allows status history tracking
-- Supports filtering by request ID (`d` tag) or status value
-- Moderator-only status updates (enforced by application logic)
-
-**Implementation:**
-
-- Located in `src/utils/statusEventUtils.ts`
-- Status values: `new`, `in-progress`, `rejected`, `completed`
-- Utility functions for creation, filtering, and processing
-
-**Benefits:**
-
-- Status updates don't require editing the original request
-- Complete audit trail of status changes
-- Easy querying of current status for any request
-- Extensible for additional metadata
+This workflow extends NIP-72 moderation metadata with a dedicated kind `9078` event that records lifecycle changes (`queued`, `in_progress`, `approved`, etc.) for each community request. Full payload schema, allowed tags, and relay expectations live in `docs/nips/STATUS_EVENTS.md`, which also traces the evolution from the earlier `30078` draft.
 
 ### Edit Events (Replaceable Event Pattern)
 
-While not a separate event kind, the app implements a custom editing pattern using the addressable event standard. The difference with an addressable event is that past events with the same kind, pubkey and `d` tag should not be discarded.
-
-**Pattern:**
-
-- Edited events use the **same kind, `d` tag, and pubkey** as the original event
-- They reference the original event via an `e` tag
-- The latest event (by `created_at`) with matching kind, `d` tag, and pubkey is considered the current version
-
-**Event Structure:**
-
-```typescript
-{
-  kind: 1111, // Same as original request/comment
-  content: string, // New text content
-  tags: [
-    ['d', string], // Same d tag as original
-    ['e', string, '', 'reply'], // Reference to original event ID
-    ['a', string], // Community reference
-    // ... other preserved tags
-  ],
-  pubkey: string, // Same pubkey as original
-  created_at: number // Later timestamp than original
-}
-```
-
-**Implementation:**
-
-- Located in `src/utils/editEventUtils.ts`
-- Functions: `createEditedEvent()`, `getLatestReplaceableEvent()`, `isReplacementEvent()`
-- Handles both request edits and comment/reply edits
-
-## Migration Notes
-
-### From NIP-23 to NIP-72
-
-The app previously used NIP-23 (kind 30023) for long-form content requests. This has been migrated to NIP-72 (kind 1111) for better community integration and standardization.
-
-**Migration Benefits:**
-
-- Better community integration via `a` tags
-- Standardized community request format
-- Improved filtering and querying
-- Alignment with Nostr community standards
+Request edits are published as pseudo-replaceable events that reuse the base request `id`, letting clients reconstruct the latest body while preserving prior revisions. The structure, tagging rules, and merge strategy are detailed in `docs/nips/EDIT_EVENTS.md`, alongside notes on how this pattern differs from the original `30079` proposal.
 
 ## References
 

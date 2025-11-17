@@ -1,14 +1,6 @@
 # Community Requests App
 
-A React-based community request management system that uses OpenBunker for Nostr authentication.
-
-## Features
-
-- **OpenBunker Authentication**: Secure Nostr key management through OAuth providers
-- **Nostr Integration**: All requests are stored and managed through Nostr relays
-- **Request Form**: Comprehensive form for submitting community requests
-- **Embeddable**: Can be embedded in other websites via iframe
-- **Dashboard**: User dashboard to manage requests and profile
+A React-based community request management system that uses OpenBunker for Nostr authentication and solely uses NOSTR as a backend.
 
 ## Getting Started
 
@@ -34,32 +26,7 @@ A React-based community request management system that uses OpenBunker for Nostr
 
 4. Open [http://localhost:5173](http://localhost:5173) in your browser
 
-## Authentication
-
-The app supports two authentication methods:
-
-### 1. OpenBunker (Recommended)
-
-- Uses Discord OAuth to generate new Nostr keys
-- Secure remote signing through bunker servers
-- No need to manage private keys locally
-
-### 2. Direct Nostr Secret Key
-
-- Use existing Nostr secret keys
-- Direct connection to relays
-- Full control over your keys
-
-## Usage
-
-### For Users
-
-1. **Login**: Visit `/login` and choose your authentication method
-2. **Dashboard**: After authentication, access your dashboard at `/dashboard`
-3. **Submit Requests**: Use the "Create New Request" button to submit new requests
-4. **Manage Profile**: Update your Nostr profile information
-
-### For Developers
+See [docs](docs/DEVELOPMENT_SETUP.md) for more details
 
 #### Embedding the Request Form
 
@@ -67,7 +34,7 @@ The request form can be embedded in other websites:
 
 ```html
 <iframe
-  src="http://localhost:5173/embed?showHeader=false&requestType=technical"
+  src="http://localhost:5173/embed"
   width="100%"
   height="600px"
   frameborder="0"
@@ -75,106 +42,66 @@ The request form can be embedded in other websites:
 </iframe>
 ```
 
-#### URL Parameters
-
-- `showHeader`: Show/hide the header (default: true)
-- `requestType`: Pre-select request type
-- `priority`: Pre-select priority level
-- `title`: Pre-fill title
-- `description`: Pre-fill description
-- `redirectUrl`: URL to redirect after submission
-- `cancelUrl`: URL to redirect on cancellation
-
-#### PostMessage Events
-
-The embedded form communicates with the parent window:
-
-```javascript
-window.addEventListener('message', event => {
-  if (event.data.type === 'REQUEST_CREATED') {
-    console.log('Request submitted:', event.data.data);
-  } else if (event.data.type === 'REQUEST_ERROR') {
-    console.error('Request error:', event.data.error);
-  } else if (event.data.type === 'REQUEST_CANCELLED') {
-    console.log('Request cancelled');
-  }
-});
-```
-
-## Architecture
-
-### Components
-
-- **NostrContext**: Manages Nostr connection and authentication state
-- **RequestForm**: Reusable form component for submitting requests
-- **LoginOptions**: Authentication method selection
-- **DashboardPage**: User dashboard and navigation
-
-### Data Flow
-
-1. User authenticates via OpenBunker or direct key
-2. Nostr connection established to relays
-3. Requests submitted as Nostr events (kind 30023)
-4. Events published to multiple relays for redundancy
-5. Dashboard displays user's requests from relays
-
-### Nostr Event Structure
-
-Requests are stored as NIP-23 long-form content events:
-
-```json
-{
-  "kind": 30023,
-  "content": "{\"title\":\"...\",\"description\":\"...\",...}",
-  "tags": [
-    ["d", "request-1234567890"],
-    ["title", "Request Title"],
-    ["requestType", "technical"],
-    ["priority", "high"],
-    ["status", "pending"],
-    ["t", "community-request"]
-  ]
-}
-```
-
-## Development
-
-### Adding New Features
-
-1. Create new components in `src/components/`
-2. Add new pages in `src/pages/`
-3. Update routing in `src/App.tsx`
-4. Add new types in `src/types/`
-
-### Styling
-
-The app uses Tailwind CSS for styling. Custom styles can be added to `src/index.css`.
-
-### Testing
-
-```bash
-# Run tests
-pnpm test
-
-# Run linting
-pnpm lint
-```
-
 ## Deployment
 
 ### Build
+
+Need to set up the environment. Copy the `.env.template` file to `.env` (for example `cp .env.template .env`) and fill in the required values before running:
+
+```dotenv
+# The url that will be opened when trying to authenticate with openbunker
+VITE_OPENBUNKER_POPUP_URL=https://openbunker.opencollective.xyz/openbunker-login-popup?scope=community-requests
+# The url that will be opened when trying to authenticate with openbunker (via e-mail confirmation)
+VITE_OPENBUNKER_API_URL=https://openbunker.opencollective.xyz
+
+# Scope used in OpenBunker (identities are scoped, allowing people to have one identity per scope and
+# separating their identity across NOSTR apps)
+VITE_OPENBUNKER_SCOPE=test-community-requests
+
+# In NOSTR NIP-72, communities have both a long Community ID
+# This is the default community that will be used as a landing page for the app
+VITE_NOSTR_COMMUNITY_ID=bc072411cb5a2c5651c8a5cfd92975cef68c165928c5e98b0705edff4301b6db
+VITE_NOSTR_COMMUNITY_IDENTIFIER=oc-test-group-mbt7yvyp
+```
 
 ```bash
 pnpm build
 ```
 
-### Environment Variables
+Artifacts in the `dist/` folder can then be used to serve the application.
 
-No environment variables are required for basic functionality. For production:
+## Dashboard
 
-- Set up proper OpenBunker server endpoints
-- Configure relay URLs
-- Set up proper CORS policies for embedding
+The main user page is User dashboard to manage requests and profile.
+
+![Dashboard View](docs/images/dashboard.png)
+
+## Authentication
+
+Authentication is needed to perform certain functions, including posting a request or a comment.
+The app supports OpenBunker authentication. The application sends an API request to the `VITE_OPENBUNKER_API_URL` endpoint, and the user will subsequently have to confirm their login by using a one-time authentication code.
+
+![Confirmation Code](docs/images/confirmation_code.png)
+
+The NOSTR protocol side of this is implemented using `nostr-tools` and doesn't require any specific adjustments to the `NIP-46` protocol.
+
+## Request Form
+
+A user submits request to the request form :
+![Request Form](docs/images/request_form.png)
+
+The request form can be embedded in other websites via iframe
+
+Requests can then be managed via the request detail page.
+
+![Request detail](docs/images/request_detail.png)
+![Request detail 2](docs/images/request_detail_reply.png)
+
+## Use of NOSTR and NIPS
+
+All requests are stored and managed through Nostr relays.
+
+The full list of NIPS used including new ones is outlined in [docs/NIP.md](docs/NIP.md).
 
 ## Contributing
 
@@ -186,12 +113,12 @@ No environment variables are required for basic functionality. For production:
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## Support
 
 For issues and questions:
 
 - Open an issue on GitHub
-- Check the Nostr documentation
-- Review OpenBunker documentation
+- Check the [Nostr documentation](https://github.com/nostr-protocol/nips/tree/master)
+- Review OpenBunker documentation on the [Openbunker Github](https://github.com/opencollective/openbunker)
