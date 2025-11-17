@@ -93,10 +93,13 @@ export function useRequestDetails(
 
   // Fetch request details and build thread
   const fetchRequestDetails = useCallback(() => {
-    if (!requestId || !pool || !isConnected) return;
-
+    if (!requestId || !pool || !isConnected) {
+      return;
+    }
     // Prevent multiple simultaneous fetches
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current) {
+      return;
+    }
     isFetchingRef.current = true;
 
     // Close existing subscriptions
@@ -108,36 +111,55 @@ export function useRequestDetails(
     // Don't clear events - let subscriptions add new ones incrementally
 
     try {
-      // First, fetch the main request
-      const sub1 = subscribeToRequestEvents(createEventByIdFilter(requestId));
-      if (sub1) subscriptionsRef.current.push(sub1);
+      const mainRequestFilter = createEventByIdFilter(requestId);
+      const sub1 = subscribeToRequestEvents(mainRequestFilter);
+      if (sub1) {
+        subscriptionsRef.current.push(sub1);
+      } else {
+        console.warn('[useRequestDetails] failed to subscribe to main request');
+      }
 
-      // Then fetch the thread (replies and related events)
-      const sub2 = subscribeToRequestEvents(createThreadFilter(requestId, 100));
-      if (sub2) subscriptionsRef.current.push(sub2);
+      const threadFilter = createThreadFilter(requestId, 100);
+      const sub2 = subscribeToRequestEvents(threadFilter);
+      if (sub2) {
+        subscriptionsRef.current.push(sub2);
+      } else {
+        console.warn('[useRequestDetails] failed to subscribe to thread');
+      }
 
-      // Fetch status events for this specific request (filtered by moderators)
-      const sub3 = subscribeToRequestEvents(
-        createStatusEventFilter(
-          requestId,
-          undefined,
-          moderatorsRef.current,
-          100
-        )
+      const statusFilter = createStatusEventFilter(
+        requestId,
+        undefined,
+        moderatorsRef.current,
+        100
       );
-      if (sub3) subscriptionsRef.current.push(sub3);
+      const sub3 = subscribeToRequestEvents(statusFilter);
+      if (sub3) {
+        subscriptionsRef.current.push(sub3);
+      } else {
+        console.warn(
+          '[useRequestDetails] failed to subscribe to status events'
+        );
+      }
 
-      // Fetch reaction events for this specific request
-      const sub4 = subscribeToRequestEvents(
-        createReactionFilter(requestId, 100)
-      );
-      if (sub4) subscriptionsRef.current.push(sub4);
+      const reactionFilter = createReactionFilter(requestId, 100);
+      const sub4 = subscribeToRequestEvents(reactionFilter);
+      if (sub4) {
+        subscriptionsRef.current.push(sub4);
+      } else {
+        console.warn(
+          '[useRequestDetails] failed to subscribe to reaction events'
+        );
+      }
 
       isFetchingRef.current = false;
-    } catch {
+    } catch (err) {
+      console.error('[useRequestDetails] error while subscribing', err);
       setError('Failed to fetch request details');
       setIsLoading(false);
       isFetchingRef.current = false;
+    } finally {
+      setIsLoading(false);
     }
   }, [requestId, pool, isConnected, subscribeToRequestEvents]);
 
@@ -235,18 +257,18 @@ export function useRequestDetails(
     }
   }, [statusEvents, requestId]);
 
-  // Initial fetch when requestId changes
+  // Initial fetch when dependencies are ready
   useEffect(() => {
-    if (requestId) {
-      fetchRequestDetails();
+    if (!requestId || !pool || !isConnected) {
+      return;
     }
-    // Cleanup subscriptions on unmount or requestId change
+    fetchRequestDetails();
+    // Cleanup subscriptions on unmount or dependency change
     return () => {
       subscriptionsRef.current.forEach(close => close());
       subscriptionsRef.current = [];
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestId]); // Only depend on requestId to avoid infinite loops
+  }, [requestId, pool, isConnected, fetchRequestDetails]);
 
   return {
     request,
