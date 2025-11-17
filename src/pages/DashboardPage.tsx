@@ -1,34 +1,91 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
+import { useCommunityById } from '../hooks/useCommunityById';
 import { useRequests, type RequestData } from '../hooks/useRequests';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import {
   RequestFilterControls,
   type RequestFilter,
 } from '../components/RequestFilterControls';
+import { parseCommunityId } from '../utils/communityUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, communityInfo } = useNostr();
+  const { communityId } = useParams<{ communityId?: string }>();
+  const {
+    isConnected,
+    pool,
+    relays,
+    communityInfo: envCommunityInfo,
+  } = useNostr();
+
+  // If communityId is in URL, use it; otherwise use environment-based community
+  const {
+    communityInfo: urlCommunityInfo,
+    isLoading: isLoadingCommunity,
+    error: communityError,
+  } = useCommunityById(communityId, isConnected, pool, relays);
+
+  // Use community from URL if available, otherwise fall back to environment
+  const communityInfo = urlCommunityInfo || envCommunityInfo;
+  const isLoadingCommunityData = communityId ? isLoadingCommunity : false;
+  const hasCommunityError = communityId ? !!communityError : false;
+
+  // Parse community ID to get community_id and identifier for requests
+  const parsedCommunity = communityId ? parseCommunityId(communityId) : null;
+
+  // Use community-specific requests hook with parsed community info
   const { requests, isLoading, error, refreshRequests } = useRequests(
-    communityInfo?.moderators || []
+    communityInfo?.moderators || [],
+    parsedCommunity?.community_id,
+    parsedCommunity?.community_identifier
   );
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
 
-  // Auto-refresh requests when connected
+  const communityDisplayName =
+    communityInfo?.name?.trim() || 'Unnamed Community';
+  const communityIdentifier = communityInfo
+    ? `${communityInfo.pubkey}:${communityInfo.identifier}`
+    : null;
+
+  const handleNavigateToCommunity = () => {
+    if (communityId) {
+      // If we have a communityId from URL, navigate to that community page
+      navigate(`/community/${encodeURIComponent(communityId)}`);
+    } else if (communityIdentifier) {
+      // Otherwise use environment-based community
+      navigate(`/community/${encodeURIComponent(communityIdentifier)}`);
+    } else {
+      navigate('/community');
+    }
+  };
+
+  // Auto-refresh requests when connected and community is loaded (if using URL community)
   useEffect(() => {
     if (isConnected) {
-      refreshRequests();
+      if (communityId) {
+        // Wait for community to load before fetching requests
+        if (communityInfo) {
+          refreshRequests();
+        }
+      } else {
+        // For environment-based community, fetch immediately
+        refreshRequests();
+      }
     }
-  }, [isConnected, refreshRequests]);
+  }, [isConnected, communityInfo, refreshRequests, communityId]);
 
   const handleViewDetails = (requestId: string) => {
     navigate(`/requests/${requestId}`);
   };
 
   const handleNewRequest = () => {
-    navigate('/request');
+    if (communityId) {
+      navigate(`/request?community=${encodeURIComponent(communityId)}`);
+    } else {
+      navigate('/request');
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -81,18 +138,105 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
+  // Show loading state if we're waiting for community from URL
+  if (isLoadingCommunityData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading community...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if community from URL couldn't be loaded
+  if (hasCommunityError && !communityInfo) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Community Not Found
+          </h1>
+          <p className="text-gray-600 mb-4">
+            {communityError || 'The requested community could not be loaded.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/communities')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Browse Communities
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Community Requests
-            </h1>
-            <p className="text-gray-600 mt-1">
+          <div className="space-y-1">
+            <div className="flex items-center gap-4 w-full">
+              <h1 className="text-3xl font-bold text-gray-900">
+                {communityInfo?.name
+                  ? `${communityInfo.name} - Requests`
+                  : 'Community Requests'}
+              </h1>
+              <button
+                type="button"
+                onClick={() => navigate('/communities')}
+                className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors ml-auto"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                Explore Communities
+              </button>
+            </div>
+            <p className="text-gray-600">
               Submit and manage community requests
             </p>
+            <button
+              type="button"
+              onClick={handleNavigateToCommunity}
+              className="group inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+            >
+              <span className="text-gray-500">Community:</span>
+              <span className="underline decoration-dotted decoration-1 underline-offset-4">
+                {communityDisplayName}
+              </span>
+              {communityIdentifier && (
+                <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                  {communityInfo?.identifier}
+                </span>
+              )}
+              <svg
+                className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
           </div>
           <ConnectionStatusBox />
         </div>
@@ -239,9 +383,11 @@ export const DashboardPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <span className="truncate">
-                        {request.description.length > 100
-                          ? `${request.description.substring(0, 100)}...`
-                          : request.description}
+                        {`#${request.dTag} ${
+                          request.description.length > 100
+                            ? `${request.description.substring(0, 100)}...`
+                            : request.description
+                        }`}
                       </span>
                     </div>
                   </div>

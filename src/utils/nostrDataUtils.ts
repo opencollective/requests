@@ -3,33 +3,13 @@
  * Centralized functions for creating Nostr events and filters
  */
 
-import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
-import { getCommunityATagFromEnv, getCommunityConfig } from './communityUtils';
-import type { RequestFormData } from '../types/RequestFormSchema';
+import { type Event, type Filter } from 'nostr-tools';
 import type { RequestData } from '../hooks/useRequests';
+import { getDTag } from './editEventUtils';
 
 // ============================================================================
 // FILTER CREATION FUNCTIONS
 // ============================================================================
-
-/**
- * Creates a filter for community request events (NIP-72)
- * @param communityATag - Optional community a tag to filter by
- * @param limit - Maximum number of events to return
- * @returns Filter for community request events
- */
-export const createCommunityRequestFilter = (
-  communityATag: string,
-  limit: number = 100
-): Filter => {
-  const filter: Filter = {
-    kinds: [1111], // NIP-72: Community Request
-    '#a': [communityATag],
-    limit,
-  };
-
-  return filter;
-};
 
 /**
  * Creates a filter for a specific event by ID
@@ -43,127 +23,94 @@ export const createEventByIdFilter = (eventId: string): Filter => {
   };
 };
 
-/**
- * Creates a filter for thread events (replies to a request)
- * @param requestId - The ID of the request
- * @param limit - Maximum number of events to return
- * @returns Filter for thread events
- */
-export const createThreadFilter = (
-  requestId: string,
-  limit: number = 100
-): Filter => {
-  return {
-    kinds: [1111], // Text notes (replies)
-    '#e': [requestId],
-    limit,
-  };
-};
-
-/**
- * Creates a filter for community request events with environment-based community tag
- * @param limit - Maximum number of events to return
- * @returns Filter for community request events
- */
-export const createCommunityRequestFilterFromEnv = (
-  limit: number = 100
-): Filter => {
-  const communityATag = getCommunityATagFromEnv();
-  return createCommunityRequestFilter(communityATag, limit);
-};
-
-// ============================================================================
-// REQUEST CREATION FUNCTIONS
-// ============================================================================
-
-/**
- * Creates a community request event (NIP-72 kind 1111)
- * @param data - Request form data
- * @param userPublicKey - User's public key (optional for unauthenticated requests)
- * @returns Unsigned event for community request
- */
-export const createCommunityRequestEvent = (
-  data: RequestFormData,
-  userPublicKey?: string
-): UnsignedEvent => {
-  const communityATag = getCommunityATagFromEnv();
-  const { community_id } = getCommunityConfig();
-  return {
-    kind: 1111, // NIP-72: Community Request -> NIP-7D
-    content: data.message,
-    tags: [
-      ['d', `request-${Date.now()}`], // Unique identifier
-      ['t', 'community-request'], // Topic tag
-      ['title', data.subject],
-      ['a', communityATag], // Community a tag
-      ['A', communityATag],
-      ['K', '34550'],
-      ['p', community_id],
-      ['P', community_id],
-    ],
-    created_at: Math.floor(Date.now() / 1000),
-    pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not
-  };
-};
-
-/**
- * Creates a reply event (kind 1) for a community request
- * @param requestId - The ID of the request being replied to
- * @param message - The reply message
- * @param userPublicKey - User's public key (optional for unauthenticated replies)
- * @param replyToEventId - Optional ID of the specific event being replied to (for nested replies)
- * @returns Unsigned event for reply
- */
-export const createReplyEvent = (
-  requestId: string,
-  requestPubkey: string,
-  message: string
-): UnsignedEvent => {
-  const tags: string[][] = [
-    ['e', requestId, '', 'root'], // Reference to the root request
-    ['p', requestPubkey], // Reference to the root request
-    ['A', getCommunityATagFromEnv()], // Community A tag
-  ];
-
-  return {
-    kind: 1111, // Text note (reply)
-    content: message,
-    tags,
-    created_at: Math.floor(Date.now() / 1000),
-    // FIXME this should be reflected in the type
-    pubkey: '',
-  };
-};
-
 // ============================================================================
 // EVENT PROCESSING FUNCTIONS
 // ============================================================================
 
 /**
  * Processes community request events into RequestData format
+ * Deduplicates by d tag to show only the latest version of each request
  * @param events - Array of Nostr events
- * @returns Array of processed request data
+ * @returns Array of processed request data (deduplicated by d tag)
  */
 export const processCommunityRequestEvents = (
   events: Event[]
 ): Omit<RequestData, 'status'>[] => {
-  return events
-    .filter(event => event.kind === 1111) // NIP-72: Community Request -> NIP-7D
-    .map(event => {
+  // Filter for community request events (kind 1111)
+  const requestEvents = events.filter(event => event.kind === 1111);
+
+  if (requestEvents.length === 0) {
+    return [];
+  }
+
+  // Group events by d tag, kind, and pubkey to find unique requests
+  // Each group represents a request (original + edits)
+  const requestGroups = new Map<string, Event[]>();
+
+  requestEvents.forEach(event => {
+    const dTag = getDTag(event);
+    if (!dTag) {
+      // Events without d tags are treated individually (shouldn't happen for requests, but handle it)
+      const key = `${event.kind}:${event.pubkey}:${event.id}`;
+      requestGroups.set(key, [event]);
+      return;
+    }
+
+    // Key: kind:dTag:pubkey - identifies a unique request
+    const key = `${event.kind}:${dTag}:${event.pubkey}`;
+    if (!requestGroups.has(key)) {
+      requestGroups.set(key, []);
+    }
+    requestGroups.get(key)!.push(event);
+  });
+
+  // For each group, get both the original event (for ID) and latest event (for content)
+  // This handles the replaceable event pattern where edits have the same d tag
+  const requestData: Array<{
+    originalEvent: Event;
+    latestEvent: Event;
+  }> = [];
+
+  requestGroups.forEach(groupEvents => {
+    if (groupEvents.length === 1) {
+      requestData.push({
+        originalEvent: groupEvents[0],
+        latestEvent: groupEvents[0],
+      });
+    } else {
+      // Multiple events with same d tag
+      // Sort by created_at: oldest first (original), newest first (latest)
+      const sorted = groupEvents.sort((a, b) => a.created_at - b.created_at);
+      const originalEvent = sorted[0];
+      const latestEvent = sorted[sorted.length - 1];
+      requestData.push({
+        originalEvent,
+        latestEvent,
+      });
+    }
+  });
+
+  // Process the events into RequestData format
+  // Use original event ID for navigation, but latest event content for display
+  return requestData
+    .map(({ originalEvent, latestEvent }) => {
       try {
-        const content = event.content;
+        const content = latestEvent.content; // Use latest content
 
         // Extract community a tag if present (NIP-72)
-        const communityATag = event.tags.find(tag => tag[0] === 'a')?.[1] || '';
-        const titleTag = event.tags.find(tag => tag[0] === 'title')?.[1] || '';
+        const communityATag =
+          latestEvent.tags.find(tag => tag[0] === 'a')?.[1] || '';
+        const titleTag =
+          latestEvent.tags.find(tag => tag[0] === 'title')?.[1] || '';
 
         return {
-          id: event.id,
+          id: originalEvent.id, // Use original event ID for stable navigation
+          dTag: getDTag(originalEvent) || getDTag(latestEvent) || undefined,
           title: titleTag || content,
           description: content || 'No message',
-          author: event.pubkey,
-          createdAt: event.created_at,
-          timestamp: event.created_at,
+          author: originalEvent.pubkey, // Use original author
+          createdAt: originalEvent.created_at, // Use original creation time
+          timestamp: latestEvent.created_at, // But sort by latest update time
           communityATag, // Add community a tag for NIP-72 compliance
         };
       } catch {
@@ -180,7 +127,7 @@ export const processCommunityRequestEvents = (
  * Processes events into a thread structure following NIP-10
  * @param events - Array of Nostr events
  * @param requestId - The ID of the main request
- * @returns Array of thread events with level and isRoot properties
+ * @returns Array of thread events with level, isRoot, and isEdit properties
  */
 export const processThreadEvents = (events: Event[], requestId: string) => {
   const uniqueEvents = events.filter(
@@ -189,17 +136,26 @@ export const processThreadEvents = (events: Event[], requestId: string) => {
 
   if (uniqueEvents.length === 0) return [];
 
-  const threadEvents: Array<Event & { level: number; isRoot: boolean }> = [];
+  const threadEvents: Array<
+    Event & { level: number; isRoot: boolean; isEdit: boolean }
+  > = [];
 
   // Find the main request
   const mainRequest = uniqueEvents.find(event => event.id === requestId);
-  if (mainRequest) {
-    threadEvents.push({
-      ...mainRequest,
-      level: 0,
-      isRoot: true,
-    });
+  if (!mainRequest) {
+    return [];
   }
+
+  // Get the d tag and pubkey from the original request to identify edits
+  const requestDTag = getDTag(mainRequest);
+  const requestPubkey = mainRequest.pubkey;
+
+  threadEvents.push({
+    ...mainRequest,
+    level: 0,
+    isRoot: true,
+    isEdit: false,
+  });
 
   // Process all events that reference this request
   const allReplies = uniqueEvents.filter(
@@ -210,11 +166,37 @@ export const processThreadEvents = (events: Event[], requestId: string) => {
       !threadEvents.some(threadEvent => threadEvent.id === event.id)
   );
 
-  // Sort replies by timestamp
-  allReplies.sort((a, b) => a.created_at - b.created_at);
+  // Identify edits: events with the same d tag and pubkey as the original request
+  const isEditEvent = (event: Event): boolean => {
+    if (!requestDTag) return false;
+    const eventDTag = getDTag(event);
+    return (
+      eventDTag === requestDTag &&
+      event.pubkey === requestPubkey &&
+      event.id !== requestId
+    );
+  };
 
-  // Build thread hierarchy using NIP-10 logic
-  const processedReplies = allReplies.map(reply => {
+  // Separate edits from regular replies
+  const edits = allReplies.filter(isEditEvent);
+  const regularReplies = allReplies.filter(event => !isEditEvent(event));
+
+  // Sort edits by timestamp
+  edits.sort((a, b) => a.created_at - b.created_at);
+
+  // Add edit events to thread (marked as edits)
+  const processedEdits = edits.map(edit => ({
+    ...edit,
+    level: 0, // Edits are at the same level as the root
+    isRoot: false,
+    isEdit: true,
+  }));
+
+  // Sort regular replies by timestamp
+  regularReplies.sort((a, b) => a.created_at - b.created_at);
+
+  // Build thread hierarchy using NIP-10 logic for regular replies
+  const processedReplies = regularReplies.map(reply => {
     // Analyze the 'e' tags to determine reply level
     const eventTags = reply.tags.filter(tag => tag[0] === 'e');
     let level = 1; // Default level for direct replies
@@ -232,61 +214,12 @@ export const processThreadEvents = (events: Event[], requestId: string) => {
       ...reply,
       level,
       isRoot: false,
+      isEdit: false,
     };
   });
 
-  // Add processed replies to thread
-  threadEvents.push(...processedReplies);
+  // Add processed edits and replies to thread
+  threadEvents.push(...processedEdits, ...processedReplies);
 
   return threadEvents;
-};
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Validates if an event is a valid community request
- * @param event - The event to validate
- * @returns True if the event is a valid community request
- */
-export const isValidCommunityRequest = (event: Event): boolean => {
-  return (
-    event.kind === 1111 && // NIP-72: Community Request -> NIP-7D
-    event.tags.some(tag => tag[0] === 't' && tag[1] === 'community-request') &&
-    event.content.length > 0
-  );
-};
-
-/**
- * Extracts the community a tag from an event
- * @param event - The event to extract from
- * @returns The community a tag or empty string
- */
-export const extractCommunityATag = (event: Event): string => {
-  return event.tags.find(tag => tag[0] === 'a')?.[1] || '';
-};
-
-/**
- * Extracts event references from an event's tags
- * @param event - The event to extract from
- * @returns Array of event IDs referenced by this event
- */
-export const extractEventReferences = (event: Event): string[] => {
-  return event.tags
-    .filter(tag => tag[0] === 'e')
-    .map(tag => tag[1])
-    .filter(Boolean);
-};
-
-/**
- * Extracts public key references from an event's tags
- * @param event - The event to extract from
- * @returns Array of public keys referenced by this event
- */
-export const extractPublicKeyReferences = (event: Event): string[] => {
-  return event.tags
-    .filter(tag => tag[0] === 'p')
-    .map(tag => tag[1])
-    .filter(Boolean);
 };

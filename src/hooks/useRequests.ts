@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
-import {
-  createCommunityRequestFilterFromEnv,
-  processCommunityRequestEvents,
-} from '../utils/nostrDataUtils';
+import { processCommunityRequestEvents } from '../utils/nostrDataUtils';
+import { createCommunityRequestFilterFromEnv } from '../utils/communityRequest';
 import {
   createStatusEventFilter,
   getLatestRequestStatus,
@@ -12,6 +10,7 @@ import {
 
 export interface RequestData {
   id: string;
+  dTag?: string;
   title: string;
   description: string;
   author: string;
@@ -19,13 +18,18 @@ export interface RequestData {
   status: string;
 }
 
-export function useRequests(moderators: string[] = []) {
+export function useRequests(
+  moderators: string[] = [],
+  overrideCommunityId?: string,
+  overrideIdentifier?: string
+) {
   const { isConnected, pool, relays } = useNostr();
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [statusEvents, setStatusEvents] = useState<Event[]>([]);
+  const [maxDTagNumber, setMaxDTagNumber] = useState(0);
 
   const fetchRequests = useCallback(async () => {
     if (!isConnected || !pool || !relays) return;
@@ -37,7 +41,11 @@ export function useRequests(moderators: string[] = []) {
       // Query for community request events (kind 1111)
       const requestEvents = await pool.querySync(
         relays,
-        createCommunityRequestFilterFromEnv(100)
+        createCommunityRequestFilterFromEnv(
+          100,
+          overrideCommunityId,
+          overrideIdentifier
+        )
       );
       setEvents(requestEvents);
 
@@ -53,7 +61,14 @@ export function useRequests(moderators: string[] = []) {
       setError('Failed to fetch requests');
       setIsLoading(false);
     }
-  }, [isConnected, pool, relays, moderators]);
+  }, [
+    isConnected,
+    pool,
+    relays,
+    moderators,
+    overrideCommunityId,
+    overrideIdentifier,
+  ]);
 
   const refreshRequests = useCallback(() => {
     fetchRequests();
@@ -63,6 +78,7 @@ export function useRequests(moderators: string[] = []) {
   useEffect(() => {
     if (events.length === 0) {
       setRequests([]);
+      setMaxDTagNumber(0);
       return;
     }
 
@@ -81,6 +97,16 @@ export function useRequests(moderators: string[] = []) {
     );
 
     setRequests(requestsWithStatus);
+
+    const numericDTags = requestsWithStatus
+      .map(request => {
+        if (!request.dTag) return NaN;
+        const parsed = Number(request.dTag);
+        return Number.isFinite(parsed) ? parsed : NaN;
+      })
+      .filter(value => !Number.isNaN(value));
+
+    setMaxDTagNumber(numericDTags.length > 0 ? Math.max(...numericDTags) : 0);
   }, [events, statusEvents]);
 
   // Auto-fetch when connected
@@ -96,5 +122,7 @@ export function useRequests(moderators: string[] = []) {
     error,
     refreshRequests,
     fetchRequests,
+    maxDTagNumber,
+    nextDTagNumber: maxDTagNumber + 1,
   };
 }

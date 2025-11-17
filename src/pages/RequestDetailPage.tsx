@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { nip19 } from 'nostr-tools';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
 import { ReplyForm } from '../components/ReplyForm';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
+import { ReactionsDisplay } from '../components/ReactionButton';
 import {
   createStatusEvent,
   STATUS_OPTIONS,
@@ -14,8 +16,14 @@ import {
   isModerator as checkIsModerator,
   type StatusOption,
 } from '../utils/statusEventUtils.ts';
+import {
+  getLatestReplaceableEvent,
+  hasBeenEdited,
+  getDTag,
+} from '../utils/editEventUtils';
 import { getCommunityATagFromEnv } from '../utils/communityUtils';
 import { type Event } from 'nostr-tools';
+import { EditForm } from '../components/EditForm';
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
@@ -28,8 +36,16 @@ export const RequestDetailPage: React.FC = () => {
     bunkerSigner,
     communityInfo,
   } = useNostr();
-  const { request, thread, status, statusEvents, isLoading, error, refetch } =
-    useRequestDetails(requestId, communityInfo?.moderators || []);
+  const {
+    request,
+    thread,
+    status,
+    statusEvents,
+    allEvents,
+    isLoading,
+    error,
+    refetch,
+  } = useRequestDetails(requestId!, communityInfo?.moderators || []);
   const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
     isConnected,
     pool,
@@ -44,6 +60,12 @@ export const RequestDetailPage: React.FC = () => {
 
   // Queue state for reply submissions
   const [queueItemId, setQueueItemId] = useState<string | null>(null);
+
+  // Dropdown state for settings menu
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+
+  // Edit state
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   // Check if current user is a moderator
   const isModerator =
@@ -80,6 +102,23 @@ export const RequestDetailPage: React.FC = () => {
       fetchMetadataForPubkey(pubkey);
     });
   }, [request, thread, statusEvents, fetchMetadataForPubkey]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.settings-dropdown-container')) {
+        setShowSettingsDropdown(false);
+      }
+    };
+
+    if (showSettingsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showSettingsDropdown]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!pool || !relays || !userPublicKey || !bunkerSigner) {
@@ -154,11 +193,19 @@ export const RequestDetailPage: React.FC = () => {
     return getStatusColor(status);
   };
 
+  // Helper function to get the latest version of an event (original or edited)
+  const getLatestEvent = (originalEvent: Event): Event => {
+    if (!allEvents) return originalEvent;
+    return getLatestReplaceableEvent(allEvents, originalEvent);
+  };
+
   const parseRequestContent = (request: Event) => {
+    // Get the latest version of the event (may be edited)
+    const latestEvent = getLatestEvent(request);
     return {
-      subject: request.tags.find(tag => tag[0] === 'title')?.[1] || '',
-      message: request.content,
-      name: getDisplayName(request.pubkey),
+      subject: latestEvent.tags.find(tag => tag[0] === 'title')?.[1] || '',
+      message: latestEvent.content,
+      name: getDisplayName(latestEvent.pubkey),
       email: '',
     };
   };
@@ -184,6 +231,17 @@ export const RequestDetailPage: React.FC = () => {
     }
   };
 
+  // Helper function to get display content (original or edited)
+  const getDisplayContent = (event: Event): string => {
+    const latestEvent = getLatestEvent(event);
+    return latestEvent.content;
+  };
+
+  // Helper function to check if user can edit an event
+  const canEditEvent = (event: Event): boolean => {
+    return userPublicKey !== null && event.pubkey === userPublicKey;
+  };
+
   // Merge status events with thread events for chronological display
   const getMergedThreadEvents = () => {
     // Convert status events to a format compatible with thread display
@@ -195,12 +253,13 @@ export const RequestDetailPage: React.FC = () => {
     }));
 
     // Convert regular thread events
-    const regularThreadEvents = thread
-      .slice(1)
-      .map((event: Event & { level: number; isRoot: boolean }) => ({
+    const regularThreadEvents = thread.slice(1).map(event => {
+      const eventWithEdit = event as unknown as Event & { isEdit: boolean };
+      return {
         ...event,
-        type: 'reply' as const,
-      }));
+        type: eventWithEdit.isEdit ? ('edit' as const) : ('reply' as const),
+      };
+    });
 
     // Merge and sort by creation time
     const allEvents = [...statusThreadEvents, ...regularThreadEvents].sort(
@@ -209,6 +268,21 @@ export const RequestDetailPage: React.FC = () => {
 
     return allEvents;
   };
+
+  // Encode the request event ID as a nevent for the raw data page
+  // This must be called before any early returns to follow Rules of Hooks
+  const neventUrl = useMemo(() => {
+    if (!request) return null;
+    try {
+      const nevent = nip19.neventEncode({
+        id: request.id,
+        relays: relays || [],
+      });
+      return `/event/${encodeURIComponent(nevent)}`;
+    } catch {
+      return null;
+    }
+  }, [request, relays]);
 
   if (!isConnected) {
     return (
@@ -271,6 +345,7 @@ export const RequestDetailPage: React.FC = () => {
   }
 
   const requestContent = parseRequestContent(request);
+  const requestDTag = request ? getDTag(request) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -288,6 +363,52 @@ export const RequestDetailPage: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Request Details
             </h1>
+            {neventUrl && (
+              <div className="settings-dropdown-container relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Settings"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </button>
+                {showSettingsDropdown && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSettingsDropdown(false);
+                          navigate(neventUrl);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        View raw event data
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Main Request */}
@@ -298,6 +419,11 @@ export const RequestDetailPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">
                     {requestContent.subject || 'No Subject'}
                   </h2>
+                  {requestDTag && (
+                    <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                      #{requestDTag}
+                    </span>
+                  )}
                   <div className="flex items-center gap-2">
                     <select
                       value={selectedStatus}
@@ -355,10 +481,67 @@ export const RequestDetailPage: React.FC = () => {
             </div>
 
             <div className="prose max-w-none">
-              <p className="text-gray-700 whitespace-pre-wrap">
-                {requestContent.message}
-              </p>
+              {editingEventId === request.id ? (
+                <EditForm
+                  originalContent={getDisplayContent(request)}
+                  originalEvent={getLatestEvent(request)}
+                  originalTitle={requestContent.subject}
+                  onEditSubmitted={() => {
+                    setEditingEventId(null);
+                    refetch();
+                  }}
+                  onCancel={() => setEditingEventId(null)}
+                />
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <p className="text-gray-700 whitespace-pre-wrap flex-1">
+                      {getDisplayContent(request)}
+                    </p>
+                    {canEditEvent(request) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingEventId(request.id)}
+                        className="ml-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Edit request"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {allEvents && hasBeenEdited(allEvents, request) && (
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      (Edited)
+                    </p>
+                  )}
+                </>
+              )}
             </div>
+
+            {/* Reactions */}
+            {request && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <ReactionsDisplay
+                  requestId={request.id}
+                  requestPubkey={request.pubkey}
+                  allEvents={allEvents}
+                  userPublicKey={userPublicKey}
+                  onReactionAdded={refetch}
+                />
+              </div>
+            )}
 
             {/* Status Messages */}
             {statusError && (
@@ -424,11 +607,46 @@ export const RequestDetailPage: React.FC = () => {
                         </p>
                       </div>
                     );
+                  } else if (event.type === 'edit') {
+                    // Display edit indicator (only showing that there is an edit)
+                    return (
+                      <div
+                        key={event.id}
+                        className="border-l-4 border-gray-300 pl-4 py-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                          <span>
+                            Request edited by {getDisplayName(event.pubkey)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(event.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    );
                   } else {
                     // Display regular reply
-                    const content = parseContent(event.content);
+                    const latestEvent = getLatestEvent(event);
+                    const displayContent = getDisplayContent(event);
+                    const parsedContent = parseContent(displayContent);
                     const indentLevel = event.level;
                     const displayName = getDisplayName(event.pubkey);
+                    const isBeingEdited = editingEventId === event.id;
+                    const hasEdit =
+                      allEvents && hasBeenEdited(allEvents, event);
 
                     return (
                       <div
@@ -443,14 +661,53 @@ export const RequestDetailPage: React.FC = () => {
                                 {displayName}
                               </span>
                               <span className="text-sm text-gray-500">
-                                {formatDate(event.created_at)}
+                                {formatDate(latestEvent.created_at)}
                               </span>
+                              {hasEdit && (
+                                <span className="text-xs text-gray-400 italic">
+                                  (Edited)
+                                </span>
+                              )}
                             </span>
                           </div>
+                          {canEditEvent(event) && !isBeingEdited && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingEventId(event.id)}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Edit reply"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          )}
                         </div>
-                        <p className="text-gray-700 whitespace-pre-wrap">
-                          {content.message}
-                        </p>
+                        {isBeingEdited ? (
+                          <EditForm
+                            originalContent={getDisplayContent(event)}
+                            originalEvent={latestEvent}
+                            onEditSubmitted={() => {
+                              setEditingEventId(null);
+                              refetch();
+                            }}
+                            onCancel={() => setEditingEventId(null)}
+                          />
+                        ) : (
+                          <p className="text-gray-700 whitespace-pre-wrap">
+                            {parsedContent.message}
+                          </p>
+                        )}
                       </div>
                     );
                   }

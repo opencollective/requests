@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { SimplePool } from 'nostr-tools';
 import {
-  getCommunityConfig,
   parseCommunityDefinitionEvent,
+  parseCommunityId,
   type CommunityInfo,
 } from '../utils/communityUtils.ts';
 
-export interface CommunityEventState {
+export interface CommunityByIdState {
   communityInfo: CommunityInfo | null;
   isLoading: boolean;
   error: string | null;
@@ -15,14 +15,15 @@ export interface CommunityEventState {
 }
 
 /**
- * Hook to fetch and manage the NIP-72 community definition event
- * This fetches the community event (kind 34550) for the configured community
+ * Hook to fetch and manage a community definition event by ID from URL
+ * The communityId should be in format: "community_id:identifier"
  */
-export function useCommunityEvent(
+export function useCommunityById(
+  communityId: string | undefined,
   isConnected: boolean,
   pool: SimplePool | null,
   relays: string[] | null
-): CommunityEventState {
+): CommunityByIdState {
   const [communityInfo, setCommunityInfo] = useState<CommunityInfo | null>(
     null
   );
@@ -30,17 +31,23 @@ export function useCommunityEvent(
   const [error, setError] = useState<string | null>(null);
 
   const fetchCommunity = useCallback(async () => {
-    if (!isConnected || !pool || !relays) {
-      setError('Not connected to Nostr relays');
+    if (!communityId) {
+      setError('No community ID provided');
+      setCommunityInfo(null);
       return;
     }
 
-    const { community_id, community_identifier } = getCommunityConfig();
-
-    if (!community_id || !community_identifier) {
+    const parsed = parseCommunityId(communityId);
+    if (!parsed) {
       setError(
-        'Community configuration not found. Please set VITE_NOSTR_COMMUNITY_ID and VITE_NOSTR_COMMUNITY_IDENTIFIER'
+        'Invalid community ID format. Expected format: "community_id:identifier"'
       );
+      setCommunityInfo(null);
+      return;
+    }
+
+    if (!isConnected || !pool || !relays) {
+      setError('Not connected to Nostr relays');
       return;
     }
 
@@ -51,14 +58,14 @@ export function useCommunityEvent(
       // Query for community definition event (kind 34550)
       const communityEvents = await pool.querySync(relays, {
         kinds: [34550], // NIP-72: Community Definition
-        authors: [community_id],
-        '#d': [community_identifier],
+        authors: [parsed.community_id],
+        '#d': [parsed.community_identifier],
         limit: 1,
       });
 
       if (communityEvents.length === 0) {
         setError(
-          `Community not found: ${community_id}:${community_identifier}`
+          `Community not found: ${parsed.community_id}:${parsed.community_identifier}`
         );
         setCommunityInfo(null);
         return;
@@ -82,18 +89,18 @@ export function useCommunityEvent(
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, pool, relays]);
+  }, [communityId, isConnected, pool, relays]);
 
   const refreshCommunity = useCallback(async () => {
     await fetchCommunity();
   }, [fetchCommunity]);
 
-  // Auto-fetch when connected
+  // Auto-fetch when connected and communityId is available
   useEffect(() => {
-    if (isConnected && !communityInfo) {
+    if (isConnected && communityId && !communityInfo) {
       fetchCommunity();
     }
-  }, [isConnected, communityInfo, fetchCommunity]);
+  }, [isConnected, communityId, communityInfo, fetchCommunity]);
 
   return {
     communityInfo,
