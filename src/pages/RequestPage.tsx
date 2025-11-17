@@ -5,6 +5,7 @@ import type { RequestFormData } from '../types/RequestFormSchema';
 import { RequestForm } from '../components/RequestForm';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
 import { createCommunityRequestEvent } from '../utils/communityRequest';
+import { useRequests } from '../hooks/useRequests';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const RequestPage: React.FC = () => {
     error: openbunkerError,
     submitToOpenBunker,
   } = useNostr();
+  const { nextDTagNumber } = useRequests();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedQueueItemId, setSubmittedQueueItemId] = useState<
@@ -36,7 +38,10 @@ const RequestPage: React.FC = () => {
       // Create NIP-72 kind 1111 event for community request
       const eventData = createCommunityRequestEvent(
         data,
-        userPublicKey || undefined
+        userPublicKey || undefined,
+        undefined,
+        undefined,
+        nextDTagNumber
       );
 
       // Add to event queue for later processing

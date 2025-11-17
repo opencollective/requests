@@ -383,9 +383,11 @@ export const DashboardPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <span className="truncate">
-                        {request.description.length > 100
-                          ? `${request.description.substring(0, 100)}...`
-                          : request.description}
+                        {`#${request.dTag} ${
+                          request.description.length > 100
+                            ? `${request.description.substring(0, 100)}...`
+                            : request.description
+                        }`}
                       </span>
                     </div>
                   </div>

@@ -10,6 +10,7 @@ import {
 
 export interface RequestData {
   id: string;
+  dTag?: string;
   title: string;
   description: string;
   author: string;
@@ -28,6 +29,7 @@ export function useRequests(
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [statusEvents, setStatusEvents] = useState<Event[]>([]);
+  const [maxDTagNumber, setMaxDTagNumber] = useState(0);
 
   const fetchRequests = useCallback(async () => {
     if (!isConnected || !pool || !relays) return;
@@ -76,6 +78,7 @@ export function useRequests(
   useEffect(() => {
     if (events.length === 0) {
       setRequests([]);
+      setMaxDTagNumber(0);
       return;
     }
 
@@ -94,6 +97,16 @@ export function useRequests(
     );
 
     setRequests(requestsWithStatus);
+
+    const numericDTags = requestsWithStatus
+      .map(request => {
+        if (!request.dTag) return NaN;
+        const parsed = Number(request.dTag);
+        return Number.isFinite(parsed) ? parsed : NaN;
+      })
+      .filter(value => !Number.isNaN(value));
+
+    setMaxDTagNumber(numericDTags.length > 0 ? Math.max(...numericDTags) : 0);
   }, [events, statusEvents]);
 
   // Auto-fetch when connected
@@ -109,5 +122,7 @@ export function useRequests(
     error,
     refreshRequests,
     fetchRequests,
+    maxDTagNumber,
+    nextDTagNumber: maxDTagNumber + 1,
   };
 }

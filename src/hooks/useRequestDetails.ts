@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNostr } from './useNostr';
 import type { Event, Filter } from 'nostr-tools';
@@ -36,7 +37,7 @@ export interface RequestDetails {
 }
 
 export function useRequestDetails(
-  requestId: string | undefined,
+  requestId: string,
   moderators: string[] = []
 ): RequestDetails {
   const { pool, isConnected } = useNostr();
@@ -58,6 +59,16 @@ export function useRequestDetails(
   // Track active subscriptions to close them when refetching
   const subscriptionsRef = useRef<Array<() => void>>([]);
   const isFetchingRef = useRef(false);
+  const pendingSubscriptionsRef = useRef(0);
+
+  const markSubscriptionCompleted = useCallback(() => {
+    if (pendingSubscriptionsRef.current > 0) {
+      pendingSubscriptionsRef.current -= 1;
+    }
+    if (pendingSubscriptionsRef.current === 0 && !isFetchingRef.current) {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Subscribe to events for a specific request
   const subscribeToRequestEvents = useCallback(
@@ -65,6 +76,15 @@ export function useRequestDetails(
       if (!pool || !isConnected) return;
 
       try {
+        let hasCompleted = false;
+        const finalize = () => {
+          if (hasCompleted) {
+            return;
+          }
+          hasCompleted = true;
+          markSubscriptionCompleted();
+        };
+
         const sub = pool.subscribe(relays, filter, {
           onevent(event: Event) {
             setEvents(prevEvents => {
@@ -77,23 +97,27 @@ export function useRequestDetails(
             });
           },
           oneose() {
-            // Subscription ended
+            finalize();
           },
         });
 
+        pendingSubscriptionsRef.current += 1;
+
         return () => {
           sub.close();
+          finalize();
         };
       } catch {
         setError('Failed to subscribe to Nostr events');
+        markSubscriptionCompleted();
       }
     },
-    [pool, isConnected]
+    [pool, isConnected, markSubscriptionCompleted]
   );
 
   // Fetch request details and build thread
   const fetchRequestDetails = useCallback(() => {
-    if (!requestId || !pool || !isConnected) {
+    if (!pool || !isConnected) {
       return;
     }
     // Prevent multiple simultaneous fetches
@@ -107,6 +131,7 @@ export function useRequestDetails(
     subscriptionsRef.current = [];
 
     setIsLoading(true);
+    pendingSubscriptionsRef.current = 0;
     setError(null);
     // Don't clear events - let subscriptions add new ones incrementally
 
@@ -153,12 +178,13 @@ export function useRequestDetails(
       }
 
       isFetchingRef.current = false;
+      if (pendingSubscriptionsRef.current === 0) {
+        setIsLoading(false);
+      }
     } catch (err) {
       console.error('[useRequestDetails] error while subscribing', err);
       setError('Failed to fetch request details');
-      setIsLoading(false);
       isFetchingRef.current = false;
-    } finally {
       setIsLoading(false);
     }
   }, [requestId, pool, isConnected, subscribeToRequestEvents]);
@@ -168,14 +194,6 @@ export function useRequestDetails(
     const uniqueEvents = events.filter(
       (event, index, arr) => arr.findIndex(e => e.id === event.id) === index
     );
-
-    if (uniqueEvents.length === 0) {
-      // Only set loading to false if we have a requestId but no events yet
-      if (requestId && !request) {
-        setIsLoading(false);
-      }
-      return;
-    }
 
     // Separate status events, reaction events, and other events
     const statusEventsFiltered = uniqueEvents.filter(
@@ -242,7 +260,6 @@ export function useRequestDetails(
         return prev;
       });
     }
-    setIsLoading(false);
   }, [events, requestId, request]);
 
   // Update status when status events change

@@ -19,6 +19,7 @@ import {
 import {
   getLatestReplaceableEvent,
   hasBeenEdited,
+  getDTag,
 } from '../utils/editEventUtils';
 import { getCommunityATagFromEnv } from '../utils/communityUtils';
 import { type Event } from 'nostr-tools';
@@ -44,7 +45,7 @@ export const RequestDetailPage: React.FC = () => {
     isLoading,
     error,
     refetch,
-  } = useRequestDetails(requestId, communityInfo?.moderators || []);
+  } = useRequestDetails(requestId!, communityInfo?.moderators || []);
   const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
     isConnected,
     pool,
@@ -344,6 +345,7 @@ export const RequestDetailPage: React.FC = () => {
   }
 
   const requestContent = parseRequestContent(request);
+  const requestDTag = request ? getDTag(request) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -417,6 +419,11 @@ export const RequestDetailPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">
                     {requestContent.subject || 'No Subject'}
                   </h2>
+                  {requestDTag && (
+                    <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                      #{requestDTag}
+                    </span>
+                  )}
                   <div className="flex items-center gap-2">
                     <select
                       value={selectedStatus}

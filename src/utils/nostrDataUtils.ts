@@ -105,6 +105,7 @@ export const processCommunityRequestEvents = (
 
         return {
           id: originalEvent.id, // Use original event ID for stable navigation
+          dTag: getDTag(originalEvent) || getDTag(latestEvent) || undefined,
           title: titleTag || content,
           description: content || 'No message',
           author: originalEvent.pubkey, // Use original author

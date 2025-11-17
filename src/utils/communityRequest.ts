@@ -14,7 +14,8 @@ export const createCommunityRequestEvent = (
   data: RequestFormData,
   userPublicKey?: string,
   overrideCommunityId?: string,
-  overrideIdentifier?: string
+  overrideIdentifier?: string,
+  nextDTagNumber?: number
 ): UnsignedEvent => {
   const communityATag = getCommunityATagFromEnv(
     overrideCommunityId,
@@ -24,11 +25,15 @@ export const createCommunityRequestEvent = (
     overrideCommunityId,
     overrideIdentifier
   );
+  const dTagValue =
+    typeof nextDTagNumber === 'number'
+      ? nextDTagNumber.toString()
+      : `request-${Date.now()}`;
   return {
     kind: 1111, // NIP-72: Community Request -> NIP-7D
     content: data.message,
     tags: [
-      ['d', `request-${Date.now()}`], // Unique identifier
+      ['d', dTagValue], // Unique identifier
       ['t', 'community-request'], // Topic tag
       ['title', data.subject],
       ['a', communityATag], // Community a tag
