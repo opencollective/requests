@@ -7,7 +7,6 @@ import {
 import { NostrProvider } from './contexts/NostrProvider';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { CommunityPage } from './pages/CommunityPage';
 import { CommunitiesPage } from './pages/CommunitiesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
@@ -28,7 +27,7 @@ function App() {
               path="/community/:communityId/*"
               element={<CommunityLayout />}
             >
-              <Route index element={<CommunityPage />} />
+              <Route index element={<DashboardPage />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="request" element={<RequestPage />} />
               <Route

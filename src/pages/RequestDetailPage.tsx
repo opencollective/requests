@@ -390,7 +390,7 @@ export const RequestDetailPage: React.FC = () => {
               ← Back to Dashboard
             </button>
             <h1 className="text-3xl font-bold text-gray-900">
-              Request Details
+              Request in {communityInfo?.name || 'Community'}
             </h1>
             {neventUrl && (
               <div className="settings-dropdown-container relative">

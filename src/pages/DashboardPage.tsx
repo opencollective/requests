@@ -8,10 +8,11 @@ import {
   type RequestFilter,
 } from '../components/RequestFilterControls';
 import { useCommunityContext } from '../hooks/useCommunityContext';
+import { getCommunityATag } from '../utils/communityUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected } = useNostr();
+  const { isConnected, metadata } = useNostr();
   const communityContext = useCommunityContext();
 
   // Call all hooks unconditionally before any early returns
@@ -19,6 +20,7 @@ export const DashboardPage: React.FC = () => {
     moderators: communityContext?.communityInfo?.moderators || [],
   });
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
+  const [isCommunityInfoExpanded, setIsCommunityInfoExpanded] = useState(false);
 
   useEffect(() => {
     if (isConnected && communityContext) {
@@ -54,16 +56,6 @@ export const DashboardPage: React.FC = () => {
   const encodedCommunityId = communityId
     ? encodeURIComponent(communityId)
     : null;
-
-  const communityDisplayName =
-    communityInfo?.name?.trim() || 'Unnamed Community';
-  const communityIdentifier = communityInfo?.identifier;
-
-  const handleNavigateToCommunity = () => {
-    if (encodedCommunityId) {
-      navigate(`/community/${encodedCommunityId}`);
-    }
-  };
 
   const handleViewDetails = (requestId: string) => {
     if (encodedCommunityId) {
@@ -162,25 +154,27 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
+  const communityATag = communityInfo
+    ? getCommunityATag(communityInfo.pubkey, communityInfo.identifier)
+    : null;
+  const chorusUrl = communityATag
+    ? `https://chorus.community/group/${encodeURIComponent(communityATag)}`
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-4 w-full">
-              <h1 className="text-3xl font-bold text-gray-900">
-                {communityInfo?.name
-                  ? `${communityInfo.name} - Requests`
-                  : 'Community Requests'}
-              </h1>
+        {/* Top Navigation Bar */}
+        <div className="mb-3 px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => navigate('/communities')}
-                className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors ml-auto"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -195,39 +189,201 @@ export const DashboardPage: React.FC = () => {
                 Explore Communities
               </button>
             </div>
-            <p className="text-gray-600">
-              Submit and manage community requests
-            </p>
-            <button
-              type="button"
-              onClick={handleNavigateToCommunity}
-              className="group inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-            >
-              <span className="text-gray-500">Community:</span>
-              <span className="underline decoration-dotted decoration-1 underline-offset-4">
-                {communityDisplayName}
-              </span>
-              {communityIdentifier && (
-                <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                  {communityInfo?.identifier}
-                </span>
-              )}
-              <svg
-                className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                {metadata?.display_name || metadata?.name || 'Profile'}
+              </button>
+              <ConnectionStatusBox />
+            </div>
           </div>
-          <ConnectionStatusBox />
+        </div>
+
+        {/* Community Header */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
+          <div
+            className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => setIsCommunityInfoExpanded(!isCommunityInfoExpanded)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsCommunityInfoExpanded(!isCommunityInfoExpanded);
+              }
+            }}
+            aria-label={isCommunityInfoExpanded ? 'Collapse' : 'Expand'}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4 flex-1">
+                {communityInfo?.image && (
+                  <img
+                    src={communityInfo.image}
+                    alt={communityInfo.name}
+                    className="w-16 h-16 object-cover rounded-lg"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {communityInfo?.name || 'Community Requests'}
+                    </h1>
+                    {chorusUrl && (
+                      <a
+                        href={chorusUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="View on Chorus"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                  {communityInfo?.description && (
+                    <p className="text-gray-600 text-sm mb-2">
+                      {communityInfo.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    {communityInfo && (
+                      <span>
+                        Created:{' '}
+                        {new Date(
+                          communityInfo.createdAt * 1000
+                        ).toLocaleDateString()}
+                      </span>
+                    )}
+                    {communityInfo?.moderators &&
+                      communityInfo.moderators.length > 0 && (
+                        <span>
+                          {communityInfo.moderators.length} moderator
+                          {communityInfo.moderators.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 text-gray-400 pointer-events-none">
+                  <svg
+                    className={`w-5 h-5 transition-transform ${
+                      isCommunityInfoExpanded ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Expanded Community Info */}
+            {isCommunityInfoExpanded && communityInfo && (
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                {communityInfo.moderators.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">
+                      Moderators
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {communityInfo.moderators.map(
+                        (moderator: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-mono"
+                          >
+                            {moderator.slice(0, 8)}...{moderator.slice(-4)}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {(communityInfo.relays.author ||
+                  communityInfo.relays.requests ||
+                  communityInfo.relays.approvals ||
+                  (communityInfo.relays.general &&
+                    communityInfo.relays.general.length > 0)) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">
+                      Relays
+                    </h4>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      {communityInfo.relays.author && (
+                        <div>
+                          <span className="font-medium">Author:</span>{' '}
+                          {communityInfo.relays.author}
+                        </div>
+                      )}
+                      {communityInfo.relays.requests && (
+                        <div>
+                          <span className="font-medium">Requests:</span>{' '}
+                          {communityInfo.relays.requests}
+                        </div>
+                      )}
+                      {communityInfo.relays.approvals && (
+                        <div>
+                          <span className="font-medium">Approvals:</span>{' '}
+                          {communityInfo.relays.approvals}
+                        </div>
+                      )}
+                      {communityInfo.relays.general &&
+                        communityInfo.relays.general.length > 0 && (
+                          <div>
+                            <span className="font-medium">General:</span>{' '}
+                            {communityInfo.relays.general.join(', ')}
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {/* Action Bar */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
