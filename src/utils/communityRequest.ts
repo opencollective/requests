@@ -1,6 +1,6 @@
 import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
-import { getCommunityATagFromEnv, getCommunityConfig } from './communityUtils';
 import type { RequestFormData } from '../types/RequestFormSchema';
+import { getCommunityATag } from './communityUtils';
 
 /**
  * Creates a community request event (NIP-72 kind 1111)
@@ -12,19 +12,12 @@ import type { RequestFormData } from '../types/RequestFormSchema';
  */
 export const createCommunityRequestEvent = (
   data: RequestFormData,
+  communityPubkey: string,
+  communityIdentifier: string,
   userPublicKey?: string,
-  overrideCommunityId?: string,
-  overrideIdentifier?: string,
   nextDTagNumber?: number
 ): UnsignedEvent => {
-  const communityATag = getCommunityATagFromEnv(
-    overrideCommunityId,
-    overrideIdentifier
-  );
-  const { community_id } = getCommunityConfig(
-    overrideCommunityId,
-    overrideIdentifier
-  );
+  const communityATag = getCommunityATag(communityPubkey, communityIdentifier);
   const dTagValue =
     typeof nextDTagNumber === 'number'
       ? nextDTagNumber.toString()
@@ -40,8 +33,8 @@ export const createCommunityRequestEvent = (
       ['A', communityATag],
       ['k', '34550'],
       ['K', '34550'],
-      ['p', community_id],
-      ['P', community_id],
+      ['p', communityPubkey],
+      ['P', communityPubkey],
     ],
     created_at: Math.floor(Date.now() / 1000),
     pubkey: userPublicKey || '', // Set the public key if authenticated, empty if not
@@ -76,10 +69,10 @@ export const createCommunityRequestFilter = (
  */
 export const createCommunityRequestFilterFromEnv = (
   limit: number = 100,
-  overrideCommunityId?: string,
-  overrideIdentifier?: string
+  overrideCommunityId: string,
+  overrideIdentifier: string
 ): Filter => {
-  const communityATag = getCommunityATagFromEnv(
+  const communityATag = getCommunityATag(
     overrideCommunityId,
     overrideIdentifier
   );

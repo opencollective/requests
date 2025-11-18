@@ -3,7 +3,6 @@ import type { Event, UnsignedEvent, VerifiedEvent } from 'nostr-tools';
 import type { NostrConnectionState } from '../hooks/useNostrConnectionState';
 import type { BunkerAuthState } from '../hooks/useBunkerAuthState';
 import type { EventQueueState } from '../hooks/useEventQueue';
-import type { CommunityEventState } from '../hooks/useCommunityEvent';
 import type { UserMetadataState } from '../hooks/useUserMetadata';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import type { OpenBunkerResponse } from '../api/openbunker';
@@ -19,7 +18,6 @@ export interface NostrContextType
   extends NostrConnectionState,
     BunkerAuthState,
     EventQueueState,
-    CommunityEventState,
     UserMetadataState,
     AuthenticatedCallbacks {
   // Computed aggregated nostr status for display

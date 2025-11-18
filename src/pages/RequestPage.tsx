@@ -6,6 +6,7 @@ import { RequestForm } from '../components/RequestForm';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
 import { createCommunityRequestEvent } from '../utils/communityRequest';
 import { useRequests } from '../hooks/useRequests';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 const RequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,13 +17,57 @@ const RequestPage: React.FC = () => {
     error: openbunkerError,
     submitToOpenBunker,
   } = useNostr();
-  const { nextDTagNumber } = useRequests();
+  const communityContext = useCommunityContext();
+
+  // Call all hooks unconditionally before any early returns
+  const { nextDTagNumber } = useRequests({
+    moderators: communityContext?.communityInfo?.moderators || [],
+  });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedQueueItemId, setSubmittedQueueItemId] = useState<
     string | null
   >(null);
   const queueDisplayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (submittedQueueItemId && queueDisplayRef.current) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        queueDisplayRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 150);
+    }
+  }, [submittedQueueItemId]);
+
+  if (!communityContext) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-6 text-center space-y-4 max-w-md">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Choose a community first
+          </h2>
+          <p className="text-gray-600">
+            Requests must belong to a community. Please select one from the
+            communities list.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/communities')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Browse communities
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { communityId, communityPubkey, communityIdentifier } =
+    communityContext;
+  const encodedCommunityId = encodeURIComponent(communityId);
 
   const defaultValues: RequestFormData = {
     name: '',
@@ -38,9 +83,9 @@ const RequestPage: React.FC = () => {
       // Create NIP-72 kind 1111 event for community request
       const eventData = createCommunityRequestEvent(
         data,
+        communityPubkey,
+        communityIdentifier,
         userPublicKey || undefined,
-        undefined,
-        undefined,
         nextDTagNumber
       );
 
@@ -59,21 +104,8 @@ const RequestPage: React.FC = () => {
   };
 
   const handleCancel = () => {
-    navigate('/dashboard');
+    navigate(`/community/${encodedCommunityId}/dashboard`);
   };
-
-  // Scroll to queue display when it appears
-  useEffect(() => {
-    if (submittedQueueItemId && queueDisplayRef.current) {
-      // Small delay to ensure the element is rendered
-      setTimeout(() => {
-        queueDisplayRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }, 150);
-    }
-  }, [submittedQueueItemId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100 flex items-center justify-center p-4">
@@ -108,8 +140,14 @@ const RequestPage: React.FC = () => {
                 >
                   <QueueItemDisplay
                     queueItemId={submittedQueueItemId}
-                    onCompleted={eventId => navigate(`/requests/${eventId}`)}
-                    onFailed={() => navigate('/dashboard')}
+                    onCompleted={eventId =>
+                      navigate(
+                        `/community/${encodedCommunityId}/requests/${eventId}`
+                      )
+                    }
+                    onFailed={() =>
+                      navigate(`/community/${encodedCommunityId}/dashboard`)
+                    }
                   />
                 </div>
               ) : undefined

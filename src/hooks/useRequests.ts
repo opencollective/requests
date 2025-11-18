@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNostr } from './useNostr';
 import type { Event } from 'nostr-tools';
 import { processCommunityRequestEvents } from '../utils/nostrDataUtils';
-import { createCommunityRequestFilterFromEnv } from '../utils/communityRequest';
+import { createCommunityRequestFilter } from '../utils/communityRequest';
 import {
   createStatusEventFilter,
   getLatestRequestStatus,
 } from '../utils/statusEventUtils';
+import { getCommunityATag } from '../utils/communityUtils';
+import { useCommunityContext } from './useCommunityContext';
 
 export interface RequestData {
   id: string;
@@ -18,11 +20,29 @@ export interface RequestData {
   status: string;
 }
 
-export function useRequests(
-  moderators: string[] = [],
-  overrideCommunityId?: string,
-  overrideIdentifier?: string
-) {
+export interface UseRequestsOptions {
+  moderators?: string[];
+  communityId?: string;
+  communityIdentifier?: string;
+}
+
+export function useRequests({
+  moderators = [],
+  communityId: overrideCommunityId,
+  communityIdentifier: overrideIdentifier,
+}: UseRequestsOptions = {}) {
+  const communityContext = useCommunityContext();
+  const resolvedCommunityId =
+    overrideCommunityId ?? communityContext?.communityPubkey;
+  const resolvedCommunityIdentifier =
+    overrideIdentifier ?? communityContext?.communityIdentifier;
+
+  if (!resolvedCommunityId || !resolvedCommunityIdentifier) {
+    throw new Error(
+      'useRequests requires community context. Render inside CommunityLayout or provide communityId and communityIdentifier overrides.'
+    );
+  }
+
   const { isConnected, pool, relays } = useNostr();
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +61,9 @@ export function useRequests(
       // Query for community request events (kind 1111)
       const requestEvents = await pool.querySync(
         relays,
-        createCommunityRequestFilterFromEnv(
-          100,
-          overrideCommunityId,
-          overrideIdentifier
+        createCommunityRequestFilter(
+          getCommunityATag(resolvedCommunityId, resolvedCommunityIdentifier),
+          100
         )
       );
       setEvents(requestEvents);
@@ -66,8 +85,8 @@ export function useRequests(
     pool,
     relays,
     moderators,
-    overrideCommunityId,
-    overrideIdentifier,
+    resolvedCommunityId,
+    resolvedCommunityIdentifier,
   ]);
 
   const refreshRequests = useCallback(() => {

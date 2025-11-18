@@ -1,5 +1,4 @@
 import { type Filter, type UnsignedEvent } from 'nostr-tools';
-import { getCommunityATagFromEnv } from './communityUtils';
 /**
  * Creates a filter for thread events (replies to a request)
  * @param requestId - The ID of the request
@@ -32,12 +31,13 @@ export const createThreadFilter = (
 export const createReplyEvent = (
   requestId: string,
   requestPubkey: string,
-  message: string
+  message: string,
+  communityATag: string
 ): UnsignedEvent => {
   const tags: string[][] = [
     ['e', requestId, '', 'root'], // Reference to the root request
     ['p', requestPubkey], // Reference to the root request
-    ['A', getCommunityATagFromEnv()], // Community A tag
+    ['A', communityATag], // Community A tag
   ];
 
   return {

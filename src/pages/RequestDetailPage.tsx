@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { nip19 } from 'nostr-tools';
+import { nip19, type Event } from 'nostr-tools';
 import { useNostr } from '../hooks/useNostr';
 import { useRequestDetails } from '../hooks/useRequestDetails';
 import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
@@ -21,21 +21,14 @@ import {
   hasBeenEdited,
   getDTag,
 } from '../utils/editEventUtils';
-import { getCommunityATagFromEnv } from '../utils/communityUtils';
-import { type Event } from 'nostr-tools';
 import { EditForm } from '../components/EditForm';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 export const RequestDetailPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  const {
-    isConnected,
-    pool,
-    relays,
-    userPublicKey,
-    bunkerSigner,
-    communityInfo,
-  } = useNostr();
+  const { isConnected, pool, relays, userPublicKey, bunkerSigner } = useNostr();
+  const communityContext = useCommunityContext();
   const {
     request,
     thread,
@@ -45,12 +38,22 @@ export const RequestDetailPage: React.FC = () => {
     isLoading,
     error,
     refetch,
-  } = useRequestDetails(requestId!, communityInfo?.moderators || []);
+  } = useRequestDetails(
+    requestId!,
+    communityContext?.communityInfo?.moderators || []
+  );
   const { getDisplayName, fetchMetadataForPubkey } = useUserMetadataByPubkey(
     isConnected,
     pool,
     relays
   );
+
+  const communityInfo = communityContext?.communityInfo;
+  const communityATag = communityContext?.communityATag || null;
+  const communityRouteId = communityContext?.communityId || null;
+  const encodedCommunityId = communityRouteId
+    ? encodeURIComponent(communityRouteId)
+    : null;
 
   // Status dropdown state
   const [selectedStatus, setSelectedStatus] = useState(status);
@@ -120,6 +123,43 @@ export const RequestDetailPage: React.FC = () => {
     }
   }, [showSettingsDropdown]);
 
+  // Encode the request event ID as a nevent for the raw data page
+  const neventUrl = useMemo(() => {
+    if (!request) return null;
+    try {
+      const nevent = nip19.neventEncode({
+        id: request.id,
+        relays: relays || [],
+      });
+      return `/event/${encodeURIComponent(nevent)}`;
+    } catch {
+      return null;
+    }
+  }, [request, relays]);
+
+  if (!communityContext || !communityATag || !encodedCommunityId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Missing community context
+          </h1>
+          <p className="text-gray-600">
+            Request details require a selected community. Please choose one from
+            the communities list.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/communities')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Browse communities
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const handleStatusChange = async (newStatus: string) => {
     if (!pool || !relays || !userPublicKey || !bunkerSigner) {
       setStatusError('Not connected to Nostr or missing bunker signer');
@@ -146,7 +186,7 @@ export const RequestDetailPage: React.FC = () => {
         newStatus,
         userPublicKey,
         {
-          communityATag: getCommunityATagFromEnv(),
+          communityATag,
         }
       );
 
@@ -269,21 +309,6 @@ export const RequestDetailPage: React.FC = () => {
     return allEvents;
   };
 
-  // Encode the request event ID as a nevent for the raw data page
-  // This must be called before any early returns to follow Rules of Hooks
-  const neventUrl = useMemo(() => {
-    if (!request) return null;
-    try {
-      const nevent = nip19.neventEncode({
-        id: request.id,
-        relays: relays || [],
-      });
-      return `/event/${encodeURIComponent(nevent)}`;
-    } catch {
-      return null;
-    }
-  }, [request, relays]);
-
   if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
@@ -333,7 +358,9 @@ export const RequestDetailPage: React.FC = () => {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() =>
+                navigate(`/community/${encodedCommunityId}/dashboard`)
+              }
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
               Back to Dashboard
@@ -355,7 +382,9 @@ export const RequestDetailPage: React.FC = () => {
           <div className="flex items-center gap-4 mb-6">
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() =>
+                navigate(`/community/${encodedCommunityId}/dashboard`)
+              }
               className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
               ← Back to Dashboard

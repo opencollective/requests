@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNostr } from '../hooks/useNostr';
 import { type Event } from 'nostr-tools';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 interface EditFormProps {
   originalContent: string;
@@ -18,6 +19,11 @@ export const EditForm: React.FC<EditFormProps> = ({
   onCancel,
 }) => {
   const { pool, relays, bunkerSigner } = useNostr();
+  const communityContext = useCommunityContext();
+  if (!communityContext) {
+    throw new Error('EditForm must be rendered within a community context');
+  }
+  const { communityATag } = communityContext;
   const [editedContent, setEditedContent] = useState(originalContent);
   const [editedTitle, setEditedTitle] = useState(originalTitle || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,16 +59,13 @@ export const EditForm: React.FC<EditFormProps> = ({
 
     try {
       const { createEditedEvent } = await import('../utils/editEventUtils');
-      const { getCommunityATagFromEnv } = await import(
-        '../utils/communityUtils'
-      );
 
       // Create the edited event (replaceable event with same kind, d tag, pubkey)
       const unsignedEvent = createEditedEvent(
         originalEvent,
         editedContent.trim(),
         {
-          communityATag: getCommunityATagFromEnv(),
+          communityATag,
           preserveTags: true,
           newTitle:
             isRequestEvent && titleChanged ? editedTitle.trim() : undefined,

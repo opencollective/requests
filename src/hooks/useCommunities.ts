@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNostr } from './useNostr';
 import {
   createCommunityDefinitionsFilter,
+  getFeaturedCommunityConfigs,
   parseCommunityDefinitionEvent,
   type CommunityInfo,
 } from '../utils/communityUtils';
+import type { Event, Filter } from 'nostr-tools';
 
 const DEFAULT_COMMUNITY_LIMIT = 50;
 
@@ -12,7 +14,7 @@ const getCommunityKey = (community: CommunityInfo) =>
   community.identifier || community.id;
 
 export function useCommunities(limit: number = DEFAULT_COMMUNITY_LIMIT) {
-  const { isConnected, pool, relays, communityInfo } = useNostr();
+  const { isConnected, pool, relays } = useNostr();
   const [fetchedCommunities, setFetchedCommunities] = useState<CommunityInfo[]>(
     []
   );
@@ -30,11 +32,29 @@ export function useCommunities(limit: number = DEFAULT_COMMUNITY_LIMIT) {
     setError(null);
 
     try {
-      const result = await pool.querySync(
-        relays,
-        createCommunityDefinitionsFilter({ limit })
-      );
-      const parsed = result
+      const primaryFilter = createCommunityDefinitionsFilter({ limit });
+      const primaryResults = await pool.querySync(relays, primaryFilter);
+
+      const featuredConfigs = getFeaturedCommunityConfigs();
+      let featuredResults: Event[] = [];
+      if (featuredConfigs.length > 0) {
+        const uniqueAuthors = Array.from(
+          new Set(featuredConfigs.map(config => config.community_id))
+        );
+        const dTags = featuredConfigs.map(
+          config => config.community_identifier
+        );
+        const featuredFilter: Filter = {
+          kinds: [34550],
+          authors: uniqueAuthors,
+          '#d': dTags,
+          limit: featuredConfigs.length,
+        };
+        featuredResults = await pool.querySync(relays, featuredFilter);
+      }
+
+      const allResults = [...primaryResults, ...featuredResults];
+      const parsed = allResults
         .map(parseCommunityDefinitionEvent)
         .filter((community): community is CommunityInfo => community !== null);
       setFetchedCommunities(parsed);
@@ -61,16 +81,12 @@ export function useCommunities(limit: number = DEFAULT_COMMUNITY_LIMIT) {
   const communities = useMemo(() => {
     const map = new Map<string, CommunityInfo>();
 
-    if (communityInfo) {
-      map.set(getCommunityKey(communityInfo), communityInfo);
-    }
-
     fetchedCommunities.forEach(community => {
       map.set(getCommunityKey(community), community);
     });
 
     return Array.from(map.values());
-  }, [communityInfo, fetchedCommunities]);
+  }, [fetchedCommunities]);
 
   return {
     communities,

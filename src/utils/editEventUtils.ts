@@ -6,7 +6,6 @@
  */
 
 import { type Event, type UnsignedEvent } from 'nostr-tools';
-import { getCommunityATagFromEnv } from './communityUtils';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -112,13 +111,13 @@ export const createEditedEvent = (
   originalEvent: Event,
   newContent: string,
   options: {
-    communityATag?: string;
+    communityATag: string;
     preserveTags?: boolean; // If true, preserve all tags from original except e tag
     newTitle?: string; // Optional new title for request events
-  } = {}
+  }
 ): UnsignedEvent => {
   const dTag = getDTag(originalEvent);
-  const communityATag = options.communityATag || getCommunityATagFromEnv();
+  const communityATag = options.communityATag;
 
   // Start with tags from original if preserveTags is true
   let tags: string[][];

@@ -14,6 +14,7 @@ import { RequestDetailPage } from './pages/RequestDetailPage';
 import { EventRawDataPage } from './pages/EventRawDataPage';
 import RequestPage from './pages/RequestPage';
 import QueueItemPage from './pages/QueueItemPage';
+import { CommunityLayout } from './contexts/CommunityContext';
 import './index.css';
 
 function App() {
@@ -23,22 +24,23 @@ function App() {
         <div className="App">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
             <Route
-              path="/community/:communityId/dashboard"
-              element={<DashboardPage />}
-            />
-            <Route path="/community/:communityId" element={<CommunityPage />} />
+              path="/community/:communityId/*"
+              element={<CommunityLayout />}
+            >
+              <Route index element={<CommunityPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="request" element={<RequestPage />} />
+              <Route
+                path="requests/:requestId"
+                element={<RequestDetailPage />}
+              />
+            </Route>
             <Route path="/communities" element={<CommunitiesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/request" element={<RequestPage />} />
-            <Route
-              path="/requests/:requestId"
-              element={<RequestDetailPage />}
-            />
             <Route path="/queue/:queueItemId" element={<QueueItemPage />} />
             <Route path="/event/:nevent" element={<EventRawDataPage />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/communities" replace />} />
           </Routes>
         </div>
       </Router>

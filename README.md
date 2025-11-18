@@ -58,10 +58,8 @@ VITE_OPENBUNKER_API_URL=https://openbunker.opencollective.xyz
 # separating their identity across NOSTR apps)
 VITE_OPENBUNKER_SCOPE=test-community-requests
 
-# In NOSTR NIP-72, communities have both a long Community ID
-# This is the default community that will be used as a landing page for the app
-VITE_NOSTR_COMMUNITY_ID=bc072411cb5a2c5651c8a5cfd92975cef68c165928c5e98b0705edff4301b6db
-VITE_NOSTR_COMMUNITY_IDENTIFIER=oc-test-group-mbt7yvyp
+# Comma separated list of featured community a tags (format 34550:<community_id>:<identifier>)
+VITE_NOSTR_FEATURED_COMMUNITIES=34550:bc072411cb5a2c5651c8a5cfd92975cef68c165928c5e98b0705edff4301b6db:oc-test-group-mbt7yvyp
 ```
 
 ```bash

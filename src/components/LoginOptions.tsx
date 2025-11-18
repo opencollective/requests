@@ -97,7 +97,7 @@ export const LoginOptions: React.FC = () => {
 
       // Redirect after successful authentication
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/communities');
       }, 1500);
     } catch (authError) {
       setMessage(

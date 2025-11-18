@@ -1,28 +1,41 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useNostr } from '../hooks/useNostr';
-import { useCommunityById } from '../hooks/useCommunityById';
+import { useNavigate } from 'react-router-dom';
 import { CommunityInfo } from '../components/CommunityInfo';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 export const CommunityPage: React.FC = () => {
-  const { communityId } = useParams<{ communityId: string }>();
   const navigate = useNavigate();
-  const { isConnected, pool, relays } = useNostr();
-  const { communityInfo, isLoading, error, refreshCommunity } =
-    useCommunityById(communityId, isConnected, pool, relays);
+  const communityContext = useCommunityContext();
 
-  if (!communityId) {
+  if (!communityContext) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Invalid Community ID
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Missing community context
           </h1>
-          <p className="text-gray-600">No community ID provided in URL</p>
+          <p className="text-gray-600">
+            Please choose a community from the communities list.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/communities')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Browse communities
+          </button>
         </div>
       </div>
     );
   }
+
+  const {
+    communityId,
+    communityInfo,
+    isCommunityLoading,
+    communityError,
+    refreshCommunity,
+  } = communityContext;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -89,16 +102,16 @@ export const CommunityPage: React.FC = () => {
               )}
             </div>
           </div>
-          {error && (
+          {communityError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mt-4">
-              <strong>Error:</strong> {error}
+              <strong>Error:</strong> {communityError}
             </div>
           )}
         </div>
 
         {/* Community Info */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          {isLoading ? (
+          {isCommunityLoading ? (
             <div className="p-4">
               <div className="animate-pulse">
                 <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
@@ -115,7 +128,7 @@ export const CommunityPage: React.FC = () => {
             <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
               <h3 className="text-gray-800 font-medium">No Community Found</h3>
               <p className="text-gray-600 text-sm mt-1">
-                {error || 'Community information not available.'}
+                {communityError || 'Community information not available.'}
               </p>
             </div>
           )}

@@ -4,6 +4,8 @@
 
 import { type Event, type Filter } from 'nostr-tools';
 
+const COMMUNITY_KIND = '34550';
+
 export interface CommunityInfo {
   id: string;
   identifier: string;
@@ -32,7 +34,69 @@ export const getCommunityATag = (
   community_id: string,
   community_identifier: string
 ): string => {
-  return `34550:${community_id}:${community_identifier}`;
+  return `${COMMUNITY_KIND}:${community_id}:${community_identifier}`;
+};
+
+export interface CommunityATagParts {
+  community_id: string;
+  community_identifier: string;
+}
+
+/**
+ * Parses a community a tag (34550:community_id:community_identifier)
+ */
+export const parseCommunityATag = (aTag: string): CommunityATagParts | null => {
+  const [kind, community_id, community_identifier] = aTag.split(':');
+  if (
+    !kind ||
+    kind !== COMMUNITY_KIND ||
+    !community_id ||
+    !community_identifier
+  ) {
+    return null;
+  }
+
+  return {
+    community_id,
+    community_identifier,
+  };
+};
+
+/**
+ * Returns featured community a tags defined in env (comma separated)
+ */
+export const getFeaturedCommunityATags = (): string[] => {
+  const envValue = import.meta.env.VITE_NOSTR_FEATURED_COMMUNITIES || '';
+  console.log('envValue', envValue);
+  return envValue
+    .split(',')
+    .map((tag: string) => tag.trim())
+    .filter(Boolean);
+};
+
+export const getFeaturedCommunityConfigs = (): Array<
+  CommunityATagParts & { aTag: string }
+> => {
+  const featuredCommunityConfigs = getFeaturedCommunityATags().map(aTag => {
+    const parts = parseCommunityATag(aTag);
+    if (!parts) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `Invalid community a tag "${aTag}" in VITE_NOSTR_FEATURED_COMMUNITIES. Expected format ${COMMUNITY_KIND}:community_id:community_identifier`
+      );
+      return null;
+    }
+    return {
+      ...parts,
+      aTag,
+    };
+  });
+  featuredCommunityConfigs.forEach(config => {
+    console.log('config', config);
+  });
+  return featuredCommunityConfigs.filter(
+    (config): config is CommunityATagParts & { aTag: string } => config !== null
+  );
 };
 
 /**
@@ -51,54 +115,6 @@ export const parseCommunityId = (
     community_id: parts[0],
     community_identifier: parts[1],
   };
-};
-
-/**
- * Gets community environment variables with fallbacks
- * @param overrideCommunityId - Optional community ID to use instead of env
- * @param overrideIdentifier - Optional identifier to use instead of env
- * @returns Object containing community_id and community_identifier
- */
-export const getCommunityConfig = (
-  overrideCommunityId?: string,
-  overrideIdentifier?: string
-) => {
-  const community_id =
-    overrideCommunityId || import.meta.env.VITE_NOSTR_COMMUNITY_ID;
-  const community_identifier =
-    overrideIdentifier || import.meta.env.VITE_NOSTR_COMMUNITY_IDENTIFIER;
-
-  if (!community_id || !community_identifier) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Missing NOSTR community configuration. Please provide community_id and identifier or set VITE_NOSTR_COMMUNITY_ID and VITE_NOSTR_COMMUNITY_IDENTIFIER'
-    );
-  }
-
-  return {
-    community_id: community_id || '',
-    community_identifier: community_identifier || '',
-  };
-};
-
-/**
- * Creates a complete community a tag using environment variables or provided parameters
- * @param overrideCommunityId - Optional community ID to use instead of env
- * @param overrideIdentifier - Optional identifier to use instead of env
- * @returns The formatted community a tag or empty string if not configured
- */
-export const getCommunityATagFromEnv = (
-  overrideCommunityId?: string,
-  overrideIdentifier?: string
-): string => {
-  const { community_id, community_identifier } = getCommunityConfig(
-    overrideCommunityId,
-    overrideIdentifier
-  );
-  if (!community_id || !community_identifier) {
-    return '';
-  }
-  return getCommunityATag(community_id, community_identifier);
 };
 
 /**

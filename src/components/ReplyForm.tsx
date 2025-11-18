@@ -3,6 +3,7 @@ import { useNostr } from '../hooks/useNostr';
 import { type UnsignedEvent } from 'nostr-tools';
 import type { RequestFormData } from '../types/RequestFormSchema';
 import { createReplyEvent } from '../utils/replies';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 interface ReplyFormProps {
   requestId: string;
@@ -28,6 +29,13 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
     setTemporaryUserName,
     metadata,
   } = useNostr();
+  const communityContext = useCommunityContext();
+
+  if (!communityContext) {
+    throw new Error('ReplyForm must be used within a community context');
+  }
+
+  const { communityATag } = communityContext;
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +65,12 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
           setTemporaryUserName(name.trim());
         }
 
-        const replyEvent = createReplyEvent(requestId, requestPubkey, message);
+        const replyEvent = createReplyEvent(
+          requestId,
+          requestPubkey,
+          message,
+          communityATag
+        );
 
         // Use submitEvent to add to queue instead of sending immediately
         submitEvent(replyEvent);
@@ -83,7 +96,12 @@ export const ReplyForm: React.FC<ReplyFormProps> = ({
         };
 
         // Create reply event and add to queue first
-        const replyEvent = createReplyEvent(requestId, requestPubkey, message);
+        const replyEvent = createReplyEvent(
+          requestId,
+          requestPubkey,
+          message,
+          communityATag
+        );
 
         // Add to event queue for later processing
         const newQueueItemId = submitEvent(replyEvent);

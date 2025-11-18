@@ -8,7 +8,6 @@ import {
 import { useNostrConnectionState } from '../hooks/useNostrConnectionState';
 import { useBunkerAuthState } from '../hooks/useBunkerAuthState';
 import { useEventQueue } from '../hooks/useEventQueue';
-import { useCommunityEvent } from '../hooks/useCommunityEvent';
 import { useUserMetadata } from '../hooks/useUserMetadata';
 import { NostrContext, type NostrContextType } from './NostrContext';
 import {
@@ -26,11 +25,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Use custom hooks for different state management
   const connectionState = useNostrConnectionState();
   const bunkerAuth = useBunkerAuthState();
-  const communityEvent = useCommunityEvent(
-    connectionState.isConnected,
-    connectionState.pool,
-    connectionState.relays
-  );
 
   // Compute userPublicKey as async value
   const [userPublicKey, setUserPublicKey] = useState<string | null>(null);
@@ -311,9 +305,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
     // Event queue state
     ...eventQueue,
-
-    // Community event state
-    ...communityEvent,
 
     // User metadata state
     ...userMetadata,

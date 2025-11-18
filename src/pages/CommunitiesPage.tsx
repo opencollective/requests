@@ -1,23 +1,59 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCommunities } from '../hooks/useCommunities';
-import type { CommunityInfo } from '../utils/communityUtils';
+import {
+  getFeaturedCommunityConfigs,
+  type CommunityInfo,
+} from '../utils/communityUtils';
+
+const getCommunityUniqueKey = (community: CommunityInfo) =>
+  `${community.pubkey}:${community.identifier}`;
 
 export const CommunitiesPage: React.FC = () => {
   const navigate = useNavigate();
   const { communities, isLoading, error, refreshCommunities } =
     useCommunities();
+  const featuredConfigs = React.useMemo(
+    () => getFeaturedCommunityConfigs(),
+    []
+  );
 
-  // Debug logging
-  React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('CommunitiesPage render:', {
-      communitiesCount: communities.length,
-      isLoading,
-      error,
-      communities,
+  const featuredCommunities = React.useMemo(() => {
+    if (featuredConfigs.length === 0 || communities.length === 0) {
+      return [];
+    }
+
+    const communityMap = new Map<string, CommunityInfo>();
+    communities.forEach(community => {
+      communityMap.set(getCommunityUniqueKey(community), community);
     });
-  }, [communities, isLoading, error]);
+
+    return featuredConfigs
+      .map(config => {
+        const key = `${config.community_id}:${config.community_identifier}`;
+        return communityMap.get(key);
+      })
+      .filter(
+        (community): community is CommunityInfo => community !== undefined
+      );
+  }, [communities, featuredConfigs]);
+  const missingFeaturedCount = Math.max(
+    featuredConfigs.length - featuredCommunities.length,
+    0
+  );
+
+  const nonFeaturedCommunities = React.useMemo(() => {
+    if (featuredCommunities.length === 0) {
+      return communities;
+    }
+
+    const featuredKeys = new Set(
+      featuredCommunities.map(getCommunityUniqueKey)
+    );
+    return communities.filter(
+      community => !featuredKeys.has(getCommunityUniqueKey(community))
+    );
+  }, [communities, featuredCommunities]);
 
   const formatDate = (timestamp: number) => {
     if (!timestamp) {
@@ -37,6 +73,89 @@ export const CommunitiesPage: React.FC = () => {
     navigate(`/community/${encodeURIComponent(communityId)}`);
   };
 
+  const renderCommunityCard = (community: CommunityInfo) => (
+    <div
+      key={community.id}
+      className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
+      onClick={() => handleViewCommunity(community)}
+    >
+      {/* Community Image */}
+      {community.image && (
+        <div className="w-full h-48 overflow-hidden bg-gray-200">
+          <img
+            src={community.image}
+            alt={community.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+
+      {/* Community Content */}
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xl font-semibold text-gray-900">
+            {community.name || 'Unnamed Community'}
+          </h3>
+          {community.identifier && (
+            <span className="text-xs text-gray-400 font-mono">
+              {community.identifier}
+            </span>
+          )}
+        </div>
+        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+          {community.description || 'No description provided.'}
+        </p>
+
+        {/* Moderators */}
+        {community.moderators.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-xs font-medium text-gray-500 mb-1">
+              Moderators
+            </h4>
+            <div className="flex flex-wrap gap-1">
+              {community.moderators.slice(0, 3).map((mod, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-mono"
+                >
+                  {mod.slice(0, 8)}...
+                </span>
+              ))}
+              {community.moderators.length > 3 && (
+                <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                  +{community.moderators.length - 3}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            Created {formatDate(community.createdAt)}
+          </div>
+          <div className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium">
+            View
+            <svg
+              className="w-4 h-4 ml-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -53,11 +172,36 @@ export const CommunitiesPage: React.FC = () => {
           )}
         </div>
 
+        {featuredCommunities.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">
+                  Featured communities
+                </h2>
+              </div>
+              {isLoading && (
+                <span className="text-xs text-gray-500">Refreshing…</span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredCommunities.map(renderCommunityCard)}
+            </div>
+            {missingFeaturedCount > 0 && (
+              <p className="text-xs text-gray-500 mt-3">
+                {missingFeaturedCount} featured communit
+                {missingFeaturedCount === 1 ? 'y' : 'ies'} not loaded from
+                relays yet.
+              </p>
+            )}
+          </section>
+        )}
+
         <div className="flex justify-between items-center mb-6">
           <div className="text-sm text-gray-600">
-            {communities.length > 0
-              ? `${communities.length} communit${
-                  communities.length === 1 ? 'y' : 'ies'
+            {nonFeaturedCommunities.length > 0
+              ? `${nonFeaturedCommunities.length} communit${
+                  nonFeaturedCommunities.length === 1 ? 'y' : 'ies'
                 } found`
               : 'No communities yet'}
           </div>
@@ -92,95 +236,14 @@ export const CommunitiesPage: React.FC = () => {
         )}
 
         {/* Communities Grid */}
-        {!isLoading && communities.length > 0 && (
+        {!isLoading && nonFeaturedCommunities.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {communities.map(community => (
-              <div
-                key={community.id}
-                className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
-                onClick={() => handleViewCommunity(community)}
-              >
-                {/* Community Image */}
-                {community.image && (
-                  <div className="w-full h-48 overflow-hidden bg-gray-200">
-                    <img
-                      src={community.image}
-                      alt={community.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-
-                {/* Community Content */}
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {community.name || 'Unnamed Community'}
-                    </h3>
-                    {community.identifier && (
-                      <span className="text-xs text-gray-400 font-mono">
-                        {community.identifier}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {community.description || 'No description provided.'}
-                  </p>
-
-                  {/* Moderators */}
-                  {community.moderators.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-xs font-medium text-gray-500 mb-1">
-                        Moderators
-                      </h4>
-                      <div className="flex flex-wrap gap-1">
-                        {community.moderators.slice(0, 3).map((mod, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-mono"
-                          >
-                            {mod.slice(0, 8)}...
-                          </span>
-                        ))}
-                        {community.moderators.length > 3 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                            +{community.moderators.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="text-xs text-gray-500">
-                      Created {formatDate(community.createdAt)}
-                    </div>
-                    <div className="flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium">
-                      View
-                      <svg
-                        className="w-4 h-4 ml-1"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+            {nonFeaturedCommunities.map(renderCommunityCard)}
           </div>
         )}
 
         {/* Empty State (if no communities) */}
-        {!isLoading && communities.length === 0 && (
+        {!isLoading && nonFeaturedCommunities.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               <svg

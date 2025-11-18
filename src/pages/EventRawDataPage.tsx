@@ -81,6 +81,7 @@ export const EventRawDataPage: React.FC = () => {
             ? err.message
             : 'Failed to decode or fetch event';
         setError(errorMessage);
+        // eslint-disable-next-line no-console
         console.error('Error fetching event:', err);
       } finally {
         setIsLoading(false);
@@ -127,10 +128,10 @@ export const EventRawDataPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/communities')}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Back to Dashboard
+              Back to Communities
             </button>
           </div>
         </div>
@@ -152,10 +153,10 @@ export const EventRawDataPage: React.FC = () => {
               </p>
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/communities')}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
-                Back to Dashboard
+                Back to Communities
               </button>
             </div>
           </div>
@@ -172,10 +173,10 @@ export const EventRawDataPage: React.FC = () => {
           <div className="flex items-center gap-4 mb-6">
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/communities')}
               className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
-              ← Back to Dashboard
+              ← Back to Communities
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Event Raw Data</h1>
           </div>

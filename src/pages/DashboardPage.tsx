@@ -1,90 +1,79 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
-import { useCommunityById } from '../hooks/useCommunityById';
 import { useRequests, type RequestData } from '../hooks/useRequests';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import {
   RequestFilterControls,
   type RequestFilter,
 } from '../components/RequestFilterControls';
-import { parseCommunityId } from '../utils/communityUtils';
+import { useCommunityContext } from '../hooks/useCommunityContext';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { communityId } = useParams<{ communityId?: string }>();
-  const {
-    isConnected,
-    pool,
-    relays,
-    communityInfo: envCommunityInfo,
-  } = useNostr();
+  const { isConnected } = useNostr();
+  const communityContext = useCommunityContext();
 
-  // If communityId is in URL, use it; otherwise use environment-based community
-  const {
-    communityInfo: urlCommunityInfo,
-    isLoading: isLoadingCommunity,
-    error: communityError,
-  } = useCommunityById(communityId, isConnected, pool, relays);
-
-  // Use community from URL if available, otherwise fall back to environment
-  const communityInfo = urlCommunityInfo || envCommunityInfo;
-  const isLoadingCommunityData = communityId ? isLoadingCommunity : false;
-  const hasCommunityError = communityId ? !!communityError : false;
-
-  // Parse community ID to get community_id and identifier for requests
-  const parsedCommunity = communityId ? parseCommunityId(communityId) : null;
-
-  // Use community-specific requests hook with parsed community info
-  const { requests, isLoading, error, refreshRequests } = useRequests(
-    communityInfo?.moderators || [],
-    parsedCommunity?.community_id,
-    parsedCommunity?.community_identifier
-  );
+  // Call all hooks unconditionally before any early returns
+  const { requests, isLoading, error, refreshRequests } = useRequests({
+    moderators: communityContext?.communityInfo?.moderators || [],
+  });
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
+
+  useEffect(() => {
+    if (isConnected && communityContext) {
+      refreshRequests();
+    }
+  }, [isConnected, refreshRequests, communityContext]);
+
+  if (!communityContext) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Choose a community first
+          </h1>
+          <p className="text-gray-600">
+            Visit the communities list and pick a community to manage requests.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/communities')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Browse communities
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { communityId, communityInfo, isCommunityLoading, communityError } =
+    communityContext;
+
+  const encodedCommunityId = communityId
+    ? encodeURIComponent(communityId)
+    : null;
 
   const communityDisplayName =
     communityInfo?.name?.trim() || 'Unnamed Community';
-  const communityIdentifier = communityInfo
-    ? `${communityInfo.pubkey}:${communityInfo.identifier}`
-    : null;
+  const communityIdentifier = communityInfo?.identifier;
 
   const handleNavigateToCommunity = () => {
-    if (communityId) {
-      // If we have a communityId from URL, navigate to that community page
-      navigate(`/community/${encodeURIComponent(communityId)}`);
-    } else if (communityIdentifier) {
-      // Otherwise use environment-based community
-      navigate(`/community/${encodeURIComponent(communityIdentifier)}`);
-    } else {
-      navigate('/community');
+    if (encodedCommunityId) {
+      navigate(`/community/${encodedCommunityId}`);
     }
   };
 
-  // Auto-refresh requests when connected and community is loaded (if using URL community)
-  useEffect(() => {
-    if (isConnected) {
-      if (communityId) {
-        // Wait for community to load before fetching requests
-        if (communityInfo) {
-          refreshRequests();
-        }
-      } else {
-        // For environment-based community, fetch immediately
-        refreshRequests();
-      }
-    }
-  }, [isConnected, communityInfo, refreshRequests, communityId]);
-
   const handleViewDetails = (requestId: string) => {
-    navigate(`/requests/${requestId}`);
+    if (encodedCommunityId) {
+      navigate(`/community/${encodedCommunityId}/requests/${requestId}`);
+    }
   };
 
   const handleNewRequest = () => {
-    if (communityId) {
-      navigate(`/request?community=${encodeURIComponent(communityId)}`);
-    } else {
-      navigate('/request');
+    if (encodedCommunityId) {
+      navigate(`/community/${encodedCommunityId}/request`);
     }
   };
 
@@ -139,7 +128,7 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Show loading state if we're waiting for community from URL
-  if (isLoadingCommunityData) {
+  if (isCommunityLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -151,7 +140,7 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Show error if community from URL couldn't be loaded
-  if (hasCommunityError && !communityInfo) {
+  if (communityError && !communityInfo) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">

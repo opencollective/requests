@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { QueueItemDisplay } from '../components/QueueItemDisplay';
@@ -12,27 +12,37 @@ const QueueItemPage: React.FC = () => {
   const backOnCompleted = searchParams.get('backOnCompleted') === 'true';
   const { getQueueItemById } = useNostr();
 
+  // Call all hooks unconditionally before any early returns
+  const queueItem = queueItemId ? getQueueItemById(queueItemId) : undefined;
+  const communityBasePath = useMemo(() => {
+    if (!queueItem) {
+      return null;
+    }
+    const tags = queueItem.event?.tags ?? [];
+    const communityTag =
+      tags.find(tag => tag[0] === 'A' || tag[0] === 'a')?.[1] || '';
+    const [, communityPubkey, communityIdentifier] = communityTag.split(':');
+    if (!communityPubkey || !communityIdentifier) {
+      return null;
+    }
+    const communityId = `${communityPubkey}:${communityIdentifier}`;
+    return `/community/${encodeURIComponent(communityId)}`;
+  }, [queueItem]);
+
   useEffect(() => {
     if (!queueItemId) {
-      navigate('/dashboard');
+      navigate('/communities');
       return;
     }
 
-    const queueItem = getQueueItemById(queueItemId);
     if (!queueItem) {
       // Queue item not found, redirect to dashboard
-      navigate('/dashboard');
+      navigate('/communities');
       return;
     }
-  }, [queueItemId, getQueueItemById, navigate]);
+  }, [queueItemId, queueItem, navigate]);
 
-  if (!queueItemId) {
-    return null;
-  }
-
-  const queueItem = getQueueItemById(queueItemId);
-
-  if (!queueItem) {
+  if (!queueItemId || !queueItem) {
     return null;
   }
 
@@ -43,9 +53,17 @@ const QueueItemPage: React.FC = () => {
           <QueueItemDisplay
             queueItemId={queueItemId}
             onCompleted={eventId =>
-              backOnCompleted ? navigate(-1) : navigate(`/requests/${eventId}`)
+              backOnCompleted
+                ? navigate(-1)
+                : communityBasePath
+                  ? navigate(`${communityBasePath}/requests/${eventId}`)
+                  : navigate('/communities')
             }
-            onFailed={() => navigate('/dashboard')}
+            onFailed={() =>
+              communityBasePath
+                ? navigate(`${communityBasePath}/dashboard`)
+                : navigate('/communities')
+            }
           />
         </div>
       </div>
