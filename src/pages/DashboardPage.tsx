@@ -281,14 +281,6 @@ export const DashboardPage: React.FC = () => {
                     </p>
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-500">
-                    {communityInfo && (
-                      <span>
-                        Created:{' '}
-                        {new Date(
-                          communityInfo.createdAt * 1000
-                        ).toLocaleDateString()}
-                      </span>
-                    )}
                     {communityInfo?.moderators &&
                       communityInfo.moderators.length > 0 && (
                         <span>
@@ -323,6 +315,12 @@ export const DashboardPage: React.FC = () => {
             {/* Expanded Community Info */}
             {isCommunityInfoExpanded && communityInfo && (
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                <div className="text-xs text-gray-500">
+                  Created:{' '}
+                  {new Date(
+                    communityInfo.createdAt * 1000
+                  ).toLocaleDateString()}
+                </div>
                 {communityInfo.moderators.length > 0 && (
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">
@@ -420,27 +418,6 @@ export const DashboardPage: React.FC = () => {
                   )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={refreshRequests}
-              disabled={isLoading}
-              className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm disabled:opacity-50"
-            >
-              <svg
-                className="w-4 h-4 mr-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-                />
-              </svg>
-              Refresh
-            </button>
           </div>
         </div>
 
@@ -514,17 +491,20 @@ export const DashboardPage: React.FC = () => {
                 className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleViewDetails(request.id)}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-base font-semibold text-gray-900 hover:text-blue-600 truncate">
-                        {request.title}
-                      </h3>
+                    <div className="flex items-start gap-2 mb-1">
                       <span
-                        className={`text-xs px-2 py-1 rounded border ${getStatusStyling(request.status)}`}
+                        className={`text-xs px-2 py-1 rounded border ${getStatusStyling(request.status)} shrink-0`}
                       >
                         {request.status}
                       </span>
+                      <h3
+                        className="flex-1 min-w-0 whitespace-normal text-base font-semibold text-gray-900 hover:text-blue-600 leading-snug line-clamp-2"
+                        title={request.title}
+                      >
+                        {request.title}
+                      </h3>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <span className="truncate">
@@ -536,15 +516,13 @@ export const DashboardPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 ml-4">
-                    <div className="text-right text-sm text-gray-500">
-                      <div>{formatDate(request.createdAt)}</div>
+                  <div className="flex items-center justify-between gap-3 text-sm text-gray-500 sm:justify-end">
+                    <div className="text-gray-500 sm:text-right">
+                      {formatDate(request.createdAt)}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-blue-600 hover:text-blue-800 text-sm">
-                        View →
-                      </span>
-                    </div>
+                    <span className="text-blue-600 hover:text-blue-800 text-sm whitespace-nowrap">
+                      View →
+                    </span>
                   </div>
                 </div>
               </div>
