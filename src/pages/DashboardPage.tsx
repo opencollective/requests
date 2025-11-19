@@ -12,7 +12,7 @@ import { getCommunityATag } from '../utils/communityUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, metadata } = useNostr();
+  const { isConnected, metadata, userPublicKey } = useNostr();
   const communityContext = useCommunityContext();
 
   // Call all hooks unconditionally before any early returns
@@ -52,6 +52,7 @@ export const DashboardPage: React.FC = () => {
 
   const { communityId, communityInfo, isCommunityLoading, communityError } =
     communityContext;
+  const isLoggedIn = Boolean(userPublicKey);
 
   const encodedCommunityId = communityId
     ? encodeURIComponent(communityId)
@@ -190,26 +191,28 @@ export const DashboardPage: React.FC = () => {
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/profile')}
-                className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-                {metadata?.display_name || metadata?.name || 'Profile'}
-              </button>
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                  {metadata?.display_name || metadata?.name || 'Profile'}
+                </button>
+              )}
               <ConnectionStatusBox />
             </div>
           </div>
