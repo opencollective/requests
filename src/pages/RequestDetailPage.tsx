@@ -376,10 +376,10 @@ export const RequestDetailPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-white to-purple-100">
-      <div className="container mx-auto px-4 py-8">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
         {/* Header */}
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-6">
+        <div className="mx-auto w-full space-y-6">
+          <div className="flex flex-wrap items-center gap-4 mb-2">
             <button
               type="button"
               onClick={() =>
@@ -441,10 +441,10 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Main Request */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 w-full overflow-hidden">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
                   <h2 className="text-xl font-semibold text-gray-900">
                     {requestContent.subject || 'No Subject'}
                   </h2>
@@ -453,7 +453,7 @@ export const RequestDetailPage: React.FC = () => {
                       #{requestDTag}
                     </span>
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={selectedStatus}
                       onChange={e => {
@@ -494,7 +494,7 @@ export const RequestDetailPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                   <span>From: {requestContent.name}</span>
                   {requestContent.email && (
                     <span>Email: {requestContent.email}</span>
@@ -502,8 +502,8 @@ export const RequestDetailPage: React.FC = () => {
                   <span>Posted: {formatDate(request.created_at)}</span>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500">
+              <div className="w-full text-left sm:w-auto sm:text-right sm:min-w-[160px]">
+                <div className="text-xs text-gray-500 break-words">
                   Author: {getAuthorDisplay(request.pubkey)}
                 </div>
               </div>
@@ -523,8 +523,8 @@ export const RequestDetailPage: React.FC = () => {
                 />
               ) : (
                 <>
-                  <div className="flex items-start justify-between">
-                    <p className="text-gray-700 whitespace-pre-wrap flex-1">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <p className="text-gray-700 whitespace-pre-wrap break-words flex-1 min-w-0">
                       {getDisplayContent(request)}
                     </p>
                     {canEditEvent(request) && (
@@ -587,7 +587,7 @@ export const RequestDetailPage: React.FC = () => {
           </div>
 
           {/* Thread */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 w-full overflow-hidden">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Activity ({getMergedThreadEvents().length} events)
             </h3>
@@ -597,7 +597,7 @@ export const RequestDetailPage: React.FC = () => {
                 <p>No activity yet. Be the first to respond!</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 w-full">
                 {getMergedThreadEvents().map(event => {
                   if (event.type === 'status') {
                     // Display status event
@@ -613,20 +613,18 @@ export const RequestDetailPage: React.FC = () => {
                         key={event.id}
                         className={getStatusContainerColors(statusTag)}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">
-                                Status Update by {getDisplayName(event.pubkey)}
-                              </span>
-                              <span
-                                className={`text-xs px-2 py-1 rounded border ${statusStyling}`}
-                              >
-                                {statusLabel}
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                {formatDate(event.created_at)}
-                              </span>
+                        <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                          <span className="font-medium text-gray-900 break-words">
+                            Status Update by {getDisplayName(event.pubkey)}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                            <span
+                              className={`text-xs px-2 py-1 rounded border ${statusStyling}`}
+                            >
+                              {statusLabel}
+                            </span>
+                            <span className="text-sm text-gray-500 whitespace-nowrap">
+                              {formatDate(event.created_at)}
                             </span>
                           </div>
                         </div>
@@ -643,7 +641,7 @@ export const RequestDetailPage: React.FC = () => {
                         key={event.id}
                         className="border-l-4 border-gray-300 pl-4 py-2 bg-gray-50 rounded"
                       >
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -680,24 +678,22 @@ export const RequestDetailPage: React.FC = () => {
                     return (
                       <div
                         key={event.id}
-                        className="border-l-4 border-blue-200 pl-4 py-3"
+                        className="border-l-4 border-blue-200 pl-4 py-3 overflow-hidden"
                         style={{ marginLeft: `${indentLevel * 16}px` }}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">
-                                {displayName}
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                {formatDate(latestEvent.created_at)}
-                              </span>
-                              {hasEdit && (
-                                <span className="text-xs text-gray-400 italic">
-                                  (Edited)
-                                </span>
-                              )}
+                        <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-gray-900 break-words">
+                              {displayName}
                             </span>
+                            <span className="text-sm text-gray-500 whitespace-nowrap">
+                              {formatDate(latestEvent.created_at)}
+                            </span>
+                            {hasEdit && (
+                              <span className="text-xs text-gray-400 italic">
+                                (Edited)
+                              </span>
+                            )}
                           </div>
                           {canEditEvent(event) && !isBeingEdited && (
                             <button
@@ -733,7 +729,7 @@ export const RequestDetailPage: React.FC = () => {
                             onCancel={() => setEditingEventId(null)}
                           />
                         ) : (
-                          <p className="text-gray-700 whitespace-pre-wrap">
+                          <p className="text-gray-700 whitespace-pre-wrap break-words">
                             {parsedContent.message}
                           </p>
                         )}
@@ -747,7 +743,7 @@ export const RequestDetailPage: React.FC = () => {
 
           {/* Queue Item Display for Reply Submissions */}
           {queueItemId && (
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6 w-full overflow-hidden">
               <QueueItemDisplay
                 queueItemId={queueItemId}
                 onCompleted={() => {
