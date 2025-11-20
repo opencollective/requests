@@ -2,25 +2,51 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequests, type RequestData } from '../hooks/useRequests';
+import { useModeratorRequests } from '../hooks/useModeratorRequests';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import {
   RequestFilterControls,
   type RequestFilter,
 } from '../components/RequestFilterControls';
+import { ModeratorRequestsSection } from '../components/ModeratorRequestsSection';
 import { useCommunityContext } from '../hooks/useCommunityContext';
 import { getCommunityATag } from '../utils/communityUtils';
+import { isModerator } from '../utils/statusEventUtils';
+import { createModeratorRequestEvent } from '../utils/moderatorRequestUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, metadata, userPublicKey } = useNostr();
+  const { isConnected, metadata, userPublicKey, pool, relays, submitEvent } =
+    useNostr();
   const communityContext = useCommunityContext();
 
   // Call all hooks unconditionally before any early returns
   const { requests, isLoading, error, refreshRequests } = useRequests({
     moderators: communityContext?.communityInfo?.moderators || [],
   });
+
+  const {
+    requests: moderatorRequests,
+    isLoading: isLoadingModeratorRequests,
+    hasUserRequested,
+    refreshRequests: refreshModeratorRequests,
+  } = useModeratorRequests(
+    communityContext?.communityPubkey,
+    communityContext?.communityIdentifier,
+    userPublicKey,
+    isConnected,
+    pool,
+    relays
+  );
+
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
   const [isCommunityInfoExpanded, setIsCommunityInfoExpanded] = useState(false);
+  const [isSubmittingModeratorRequest, setIsSubmittingModeratorRequest] =
+    useState(false);
+  const [moderatorRequestError, setModeratorRequestError] = useState<
+    string | null
+  >(null);
+  const [moderatorRequestMessage, setModeratorRequestMessage] = useState('');
 
   useEffect(() => {
     if (isConnected && communityContext) {
@@ -50,9 +76,19 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const { communityId, communityInfo, isCommunityLoading, communityError } =
-    communityContext;
+  const {
+    communityId,
+    communityInfo,
+    isCommunityLoading,
+    communityError,
+    communityPubkey,
+    communityIdentifier,
+  } = communityContext;
   const isLoggedIn = Boolean(userPublicKey);
+  const userIsModerator =
+    userPublicKey && communityInfo
+      ? isModerator(userPublicKey, communityInfo.moderators)
+      : false;
 
   const encodedCommunityId = communityId
     ? encodeURIComponent(communityId)
@@ -67,6 +103,57 @@ export const DashboardPage: React.FC = () => {
   const handleNewRequest = () => {
     if (encodedCommunityId) {
       navigate(`/community/${encodedCommunityId}/request`);
+    }
+  };
+
+  const handleRequestModerator = async () => {
+    // Provide more specific error messages to help debug
+    if (!communityPubkey) {
+      setModeratorRequestError(
+        'Community pubkey is missing. Please refresh the page.'
+      );
+      return;
+    }
+    if (!communityIdentifier) {
+      setModeratorRequestError(
+        'Community identifier is missing. Please refresh the page.'
+      );
+      return;
+    }
+    if (!submitEvent) {
+      setModeratorRequestError(
+        'Event submission not available. Please refresh the page.'
+      );
+      return;
+    }
+
+    setIsSubmittingModeratorRequest(true);
+    setModeratorRequestError(null);
+
+    try {
+      // Create the moderator request event
+      const requestEvent = createModeratorRequestEvent(
+        communityPubkey,
+        communityIdentifier,
+        userPublicKey || '', // Will be set when signed
+        moderatorRequestMessage ||
+          'I would like to join this community as a moderator.'
+      );
+
+      // Add to event queue for later processing (same pattern as RequestPage)
+      submitEvent(requestEvent);
+
+      // Clear the message and refresh requests
+      setModeratorRequestMessage('');
+      await refreshModeratorRequests();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : 'Failed to submit moderator request';
+      setModeratorRequestError(errorMessage);
+    } finally {
+      setIsSubmittingModeratorRequest(false);
     }
   };
 
@@ -423,6 +510,73 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Moderator Requests Section - Only visible to moderators */}
+        {userIsModerator && (
+          <div className="mb-6">
+            <ModeratorRequestsSection
+              requests={moderatorRequests}
+              isLoading={isLoadingModeratorRequests}
+              onRefresh={refreshModeratorRequests}
+            />
+          </div>
+        )}
+
+        {/* Request to be Moderator Section - Only visible to non-moderators who are logged in */}
+        {isLoggedIn && !userIsModerator && (
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Request to be a Moderator
+            </h2>
+            {hasUserRequested ? (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md">
+                <p className="text-sm">
+                  You have already submitted a request to become a moderator.
+                  Please wait for a moderator to review your request.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="moderator-request-message"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
+                    Message (optional)
+                  </label>
+                  <textarea
+                    id="moderator-request-message"
+                    value={moderatorRequestMessage}
+                    onChange={e => setModeratorRequestMessage(e.target.value)}
+                    placeholder="I would like to join this community as a moderator..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    rows={3}
+                  />
+                </div>
+                {moderatorRequestError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                    {moderatorRequestError}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleRequestModerator}
+                  disabled={isSubmittingModeratorRequest}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingModeratorRequest ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Request to be Moderator'
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (

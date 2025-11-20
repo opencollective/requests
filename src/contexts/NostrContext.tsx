@@ -11,6 +11,7 @@ import type { OpenBunkerResponse } from '../api/openbunker';
 export interface AuthenticatedCallbacks {
   logout: () => Promise<void>;
   sendVerifiedEvent: (event: VerifiedEvent) => Promise<Event>;
+  signAndSendEvent: (event: UnsignedEvent) => Promise<Event>;
   submitEvent: (event: UnsignedEvent) => string; // Returns the queue item ID
 }
 

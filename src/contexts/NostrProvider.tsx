@@ -323,6 +323,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     // Callbacks
     logout,
     sendVerifiedEvent,
+    signAndSendEvent,
     submitEvent,
   };
 

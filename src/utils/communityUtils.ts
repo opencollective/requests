@@ -2,7 +2,7 @@
  * Community utilities for NIP-72 implementation
  */
 
-import { type Event, type Filter } from 'nostr-tools';
+import { type Event, type Filter, type UnsignedEvent } from 'nostr-tools';
 
 const COMMUNITY_KIND = '34550';
 
@@ -213,4 +213,63 @@ export const createCommunityDefinitionsFilter = (
   }
 
   return filter;
+};
+
+/**
+ * Creates an updated community definition event with a new moderator added
+ * This is a replaceable event (kind 34550 with d tag), so publishing this will replace the old one
+ * @param currentEvent - The current community definition event
+ * @param newModeratorPubkey - The public key of the new moderator to add
+ * @param moderatorRelay - Optional relay URL for the new moderator
+ * @returns Unsigned event with the new moderator added
+ */
+export const createUpdatedCommunityDefinitionWithModerator = (
+  currentEvent: Event,
+  newModeratorPubkey: string,
+  moderatorRelay?: string
+): UnsignedEvent => {
+  // Get the d tag (identifier) from the current event
+  const dTag = currentEvent.tags.find(tag => tag[0] === 'd');
+  if (!dTag || !dTag[1]) {
+    throw new Error('Current community event must have a d tag');
+  }
+
+  // Get all existing tags except moderator p tags
+  const existingTags = currentEvent.tags.filter(
+    tag => !(tag[0] === 'p' && tag[3] === 'moderator')
+  );
+
+  // Get existing moderators
+  const existingModerators = currentEvent.tags
+    .filter(tag => tag[0] === 'p' && tag[3] === 'moderator')
+    .map(tag => tag[1]);
+
+  // Check if moderator already exists
+  if (existingModerators.includes(newModeratorPubkey)) {
+    throw new Error('Moderator already exists in community');
+  }
+
+  // Create new moderator tag
+  const newModeratorTag: string[] = ['p', newModeratorPubkey];
+  newModeratorTag.push(moderatorRelay || '');
+  newModeratorTag.push('moderator');
+
+  // Re-add all existing moderator tags
+  const moderatorTags = currentEvent.tags
+    .filter(tag => tag[0] === 'p' && tag[3] === 'moderator')
+    .map(tag => [...tag]); // Clone the tag arrays
+
+  // Add the new moderator tag
+  moderatorTags.push(newModeratorTag);
+
+  // Combine all tags: existing non-moderator tags + all moderator tags
+  const allTags = [...existingTags, ...moderatorTags];
+
+  return {
+    kind: 34550,
+    pubkey: currentEvent.pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: allTags,
+    content: currentEvent.content,
+  };
 };
