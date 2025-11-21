@@ -75,16 +75,16 @@ export const ModeratorRequestsSection: React.FC<
 
       const currentEvent = communityEvents[0];
 
-      // Check if the current user is a moderator
+      // Check if the current user is the owner
+      if (currentEvent.pubkey !== userPublicKey) {
+        throw new Error('Only the owner can accept moderator requests');
+      }
+
+      // Check if the requesting user is already a moderator
       const moderators = currentEvent.tags
         .filter(tag => tag[0] === 'p' && tag[3] === 'moderator')
         .map(tag => tag[1]);
 
-      if (!moderators.includes(userPublicKey)) {
-        throw new Error('Only moderators can accept requests');
-      }
-
-      // Check if the requesting user is already a moderator
       if (moderators.includes(request.pubkey)) {
         throw new Error('User is already a moderator');
       }
@@ -105,25 +105,6 @@ export const ModeratorRequestsSection: React.FC<
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to accept request';
-      setError(errorMessage);
-      setProcessingRequestId(null);
-    }
-  };
-
-  const handleRejectRequest = async (request: ModeratorRequestData) => {
-    // For now, rejection just means not accepting
-    // In the future, we could create a rejection event
-    setProcessingRequestId(request.id);
-    setError(null);
-
-    try {
-      // Just refresh to remove it from the list if needed
-      // In a real implementation, you might want to create a rejection event
-      await onRefresh();
-      setProcessingRequestId(null);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to reject request';
       setError(errorMessage);
       setProcessingRequestId(null);
     }
@@ -209,14 +190,6 @@ export const ModeratorRequestsSection: React.FC<
                     className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? 'Processing...' : 'Accept'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRejectRequest(request)}
-                    disabled={isProcessing}
-                    className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? 'Processing...' : 'Reject'}
                   </button>
                 </div>
               </div>
