@@ -1,11 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SimplePool } from 'nostr-tools';
 
-const relays = [
-  'wss://relay.chorus.community',
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-];
+const relays = ['wss://relay.chorus.community', 'wss://nos.lol'];
 
 // Pool and general Nostr connection state (no authentication required)
 export interface NostrConnectionState {
