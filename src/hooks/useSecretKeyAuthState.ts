@@ -6,7 +6,7 @@ export interface SecretKeyAuthState {
   localSecretKey: Uint8Array | null;
   secretKeyError: string | null;
   secretKeyLogout: () => Promise<void>;
-  setLocalSecretKey: (secretKey: Uint8Array) => void;
+  setLocalSecretKey: (secretKey: Uint8Array) => Promise<void>;
 }
 export function useSecretKeyAuthState(): SecretKeyAuthState {
   const [localSecretKey, setLocalSecretKeyState] = useState<Uint8Array | null>(

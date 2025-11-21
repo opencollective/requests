@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { nip19 } from 'nostr-tools';
 import { useNostr } from '../hooks/useNostr';
 import { buildApiUrl, OPENBUNKER_CONFIG } from '../config/openbunker';
 
@@ -18,11 +19,15 @@ export const LoginOptions: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [bunkerToken, setBunkerToken] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [nsecInput, setNsecInput] = useState('');
+  const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [advancedMessage, setAdvancedMessage] = useState('');
 
   // Get scope from environment variable
   const scope = import.meta.env.VITE_OPENBUNKER_SCOPE || 'community-requests';
 
-  const { handleBunkerConnectionToken } = useNostr();
+  const { handleBunkerConnectionToken, setLocalSecretKey } = useNostr();
   const navigate = useNavigate();
 
   const handleRequestCode = async (e: React.FormEvent) => {
@@ -65,6 +70,50 @@ export const LoginOptions: React.FC = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNsecLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdvancedLoading(true);
+    setAdvancedMessage('');
+
+    try {
+      const trimmed = nsecInput.trim();
+
+      if (!trimmed) {
+        throw new Error('Please enter your nsec secret key');
+      }
+
+      if (!trimmed.startsWith('nsec1')) {
+        throw new Error('Secret key must start with "nsec1"');
+      }
+
+      const decoded = nip19.decode(trimmed);
+
+      if (decoded.type !== 'nsec') {
+        throw new Error(`Invalid NIP-19 type: ${decoded.type}`);
+      }
+
+      const secretKeyArray =
+        decoded.data instanceof Uint8Array
+          ? decoded.data
+          : new Uint8Array(decoded.data as number[]);
+
+      await setLocalSecretKey(secretKeyArray);
+
+      setAdvancedMessage('Secret key saved! Redirecting...');
+      setNsecInput('');
+
+      setTimeout(() => {
+        navigate('/communities');
+      }, 1000);
+    } catch (err) {
+      setAdvancedMessage(
+        `nsec login failed: ${err instanceof Error ? err.message : 'Unknown error'}`
+      );
+    } finally {
+      setAdvancedLoading(false);
     }
   };
 
@@ -315,6 +364,106 @@ export const LoginOptions: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(prev => !prev)}
+          className="w-full flex items-center justify-between px-3 py-2 text-left text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          <span>Advanced options</span>
+          <svg
+            className={`w-5 h-5 transform transition-transform text-gray-500 ${
+              showAdvanced ? 'rotate-180' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        {showAdvanced && (
+          <div className="pt-2 px-3 pb-3 space-y-3">
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 mb-1">
+                Sign in with nsec
+              </h3>
+              <p className="text-xs text-gray-500">
+                Paste your Nostr secret key (nsec) to sign in locally. Keep this
+                key private.
+              </p>
+            </div>
+
+            <form onSubmit={handleNsecLogin} className="space-y-3">
+              <div>
+                <label
+                  htmlFor="nsec"
+                  className="block text-sm font-medium text-gray-600 mb-2"
+                >
+                  Nostr Secret Key (nsec)
+                </label>
+                <textarea
+                  id="nsec"
+                  value={nsecInput}
+                  onChange={e => setNsecInput(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white font-mono text-sm"
+                  placeholder="nsec1..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={advancedLoading || !nsecInput.trim()}
+                className="w-full bg-gray-900 text-white py-2.5 px-4 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {advancedLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 12h14m-7-7l7 7-7 7"
+                      />
+                    </svg>
+                    <span>Use nsec</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {advancedMessage && (
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  advancedMessage.toLowerCase().includes('failed')
+                    ? 'bg-red-50 text-red-800 border border-red-200'
+                    : 'bg-green-50 text-green-800 border border-green-200'
+                }`}
+              >
+                {advancedMessage}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
