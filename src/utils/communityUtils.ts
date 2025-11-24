@@ -67,7 +67,6 @@ export const parseCommunityATag = (aTag: string): CommunityATagParts | null => {
  */
 export const getFeaturedCommunityATags = (): string[] => {
   const envValue = import.meta.env.VITE_NOSTR_FEATURED_COMMUNITIES || '';
-  console.log('envValue', envValue);
   return envValue
     .split(',')
     .map((tag: string) => tag.trim())
@@ -91,9 +90,7 @@ export const getFeaturedCommunityConfigs = (): Array<
       aTag,
     };
   });
-  featuredCommunityConfigs.forEach(config => {
-    console.log('config', config);
-  });
+
   return featuredCommunityConfigs.filter(
     (config): config is CommunityATagParts & { aTag: string } => config !== null
   );

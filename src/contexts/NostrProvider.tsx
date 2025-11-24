@@ -250,7 +250,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       bunkerSignerfromURI(localSecretKey, connectionUri),
       popupPromise,
     ]);
-    console.log('bunkerSigner:', bunkerSigner);
 
     // If we get here, connection was successful
     await bunkerAuth.connected(bunkerSigner, localSecretKey);

@@ -368,7 +368,6 @@ test('request to become a moderator', async ({ browser }) => {
   await expect(
     ownerPage.getByRole('button', { name: 'Collapse' })
   ).toBeVisible();
-  await ownerPage.pause();
   // Cleanup contexts
   await ownerContext.close();
   await teamMemberContext.close();
