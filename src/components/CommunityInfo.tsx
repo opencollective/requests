@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCommunityContext } from '../hooks/useCommunityContext';
 import { useNostr } from '../hooks/useNostr';
 import { useModeratorRequests } from '../hooks/useModeratorRequests';
+import { useUserMetadataByPubkey } from '../hooks/useUserMetadataByPubkey';
 import {
   getCommunityATag,
   parseCommunityId,
@@ -59,6 +60,21 @@ export const CommunityInfo: React.FC = () => {
     pool,
     relays
   );
+
+  const { metadataByPubkey, fetchMetadataForPubkey } = useUserMetadataByPubkey(
+    isConnected,
+    pool,
+    relays
+  );
+
+  useEffect(() => {
+    if (!communityInfo?.moderators?.length) {
+      return;
+    }
+    communityInfo.moderators.forEach(pubkey => {
+      fetchMetadataForPubkey(pubkey);
+    });
+  }, [communityInfo?.moderators, fetchMetadataForPubkey]);
 
   // Filter out requests from users who are already moderators
   const filteredModeratorRequests = useMemo(() => {
@@ -231,7 +247,7 @@ export const CommunityInfo: React.FC = () => {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
       <div
-        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="p-4 cursor-pointer hover:bg-gray-50 transition-colors select-none"
         onClick={() => setIsExpanded(!isExpanded)}
         role="button"
         tabIndex={0}
@@ -299,7 +315,7 @@ export const CommunityInfo: React.FC = () => {
                 )}
               </div>
               {communityInfo?.description && (
-                <p className="text-gray-600 text-sm mb-2">
+                <p className="text-gray-600 text-sm mb-2 select-text">
                   {communityInfo.description}
                 </p>
               )}
@@ -334,14 +350,12 @@ export const CommunityInfo: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Expanded Community Info */}
-        {isExpanded && communityInfo && (
-          <div
-            className="mt-4 pt-4 border-t border-gray-200 space-y-4"
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}
-          >
+      {/* Expanded Community Info */}
+      {isExpanded && communityInfo && (
+        <div className="px-4 pb-4">
+          <div className="mt-0 pt-4 border-t border-gray-200 space-y-4">
             <div className="text-xs text-gray-500">
               Created:{' '}
               {new Date(communityInfo.createdAt * 1000).toLocaleDateString()}
@@ -375,6 +389,22 @@ export const CommunityInfo: React.FC = () => {
                           const isOwner = moderator === communityInfo.pubkey;
                           const canRemove =
                             userIsOwner && !isOwner && !removingModerator;
+                          const moderatorMetadata =
+                            metadataByPubkey[moderator] || null;
+                          const truncatedPubkey = `${moderator.slice(
+                            0,
+                            8
+                          )}...${moderator.slice(-4)}`;
+                          const primaryDisplayName =
+                            moderatorMetadata?.nip05 ||
+                            moderatorMetadata?.display_name ||
+                            moderatorMetadata?.name ||
+                            truncatedPubkey;
+                          const secondaryDisplay =
+                            moderatorMetadata?.nip05 &&
+                            primaryDisplayName !== moderatorMetadata.nip05
+                              ? moderatorMetadata.nip05
+                              : truncatedPubkey;
                           return (
                             <tr
                               key={index}
@@ -385,16 +415,18 @@ export const CommunityInfo: React.FC = () => {
                               }
                             >
                               <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-0.5">
                                   <span
-                                    className={`font-mono text-xs ${
+                                    className={`text-sm font-medium ${
                                       isCurrentUser
                                         ? 'text-purple-700'
                                         : 'text-gray-900'
                                     }`}
                                   >
-                                    {moderator.slice(0, 8)}...
-                                    {moderator.slice(-4)}
+                                    {primaryDisplayName}
+                                  </span>
+                                  <span className="font-mono text-[11px] text-gray-500">
+                                    {secondaryDisplay}
                                   </span>
                                 </div>
                               </td>
@@ -604,8 +636,8 @@ export const CommunityInfo: React.FC = () => {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
