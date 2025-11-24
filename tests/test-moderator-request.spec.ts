@@ -356,7 +356,6 @@ test('request to become a moderator', async ({ browser }) => {
     name: 'Request to be Moderator',
   });
 
-  // await teamMemberPage.pause();
   await expect(requestModeratorButton).toBeVisible({ timeout: 15000 });
   await expect(requestModeratorButton).toBeEnabled();
   await requestModeratorButton.click();
