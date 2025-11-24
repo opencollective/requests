@@ -12,6 +12,7 @@ jobs:
   test:
     name: Playwright (Chromium, headless)
     runs-on: ubuntu-latest
+    environment: test_ci
 
     steps:
       - name: Checkout repository

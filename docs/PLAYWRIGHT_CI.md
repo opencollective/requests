@@ -5,7 +5,8 @@ to provide the secret test seed data file needed by the tests.
 
 ## Overview
 
-- The workflow lives in `.github/workflows/playwright.yml`.
+- The workflow lives in `.github/workflows/playwright.yml` and targets the
+  `test_ci` GitHub environment.
 - It executes on every pull request and runs `pnpm test`, which maps to
   `playwright test`. Chromium runs in headless mode (Playwright's default).
 - Before the test run, the workflow reconstructs `tests/fixtures/seed-data.json`
@@ -25,8 +26,8 @@ to provide the secret test seed data file needed by the tests.
    ```bash
    base64 -w0 tests/fixtures/seed-data.json | xclip -selection clipboard
    ```
-3. In GitHub, navigate to **Settings → Secrets and variables → Actions** for
-   this repository and create a new secret named
+3. In GitHub, navigate to **Settings → Environments → test_ci → Environment
+   secrets** for this repository and create a new secret named
    `PLAYWRIGHT_SEED_DATA_JSON`. Paste the base64 string as the value.
 
 > The secret only needs to contain one line (no newline at the end). If your
