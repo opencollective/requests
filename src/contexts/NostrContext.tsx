@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import type { Event, UnsignedEvent, VerifiedEvent } from 'nostr-tools';
 import type { NostrConnectionState } from '../hooks/useNostrConnectionState';
 import type { BunkerAuthState } from '../hooks/useBunkerAuthState';
+import type { SecretKeyAuthState } from '../hooks/useSecretKeyAuthState';
 import type { EventQueueState } from '../hooks/useEventQueue';
 import type { UserMetadataState } from '../hooks/useUserMetadata';
 import type { RequestFormData } from '../types/RequestFormSchema';
@@ -18,6 +19,7 @@ export interface AuthenticatedCallbacks {
 export interface NostrContextType
   extends NostrConnectionState,
     BunkerAuthState,
+    SecretKeyAuthState,
     EventQueueState,
     UserMetadataState,
     AuthenticatedCallbacks {

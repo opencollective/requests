@@ -13,11 +13,7 @@ import {
 import { createThreadFilter } from '../utils/replies';
 import { createReactionFilter } from '../utils/reactionUtils';
 
-const relays = [
-  'wss://relay.chorus.community',
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-];
+const relays = ['wss://relay.chorus.community', 'wss://nos.lol'];
 
 export interface ThreadEvent extends Event {
   level: number;

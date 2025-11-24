@@ -67,7 +67,6 @@ export const parseCommunityATag = (aTag: string): CommunityATagParts | null => {
  */
 export const getFeaturedCommunityATags = (): string[] => {
   const envValue = import.meta.env.VITE_NOSTR_FEATURED_COMMUNITIES || '';
-  console.log('envValue', envValue);
   return envValue
     .split(',')
     .map((tag: string) => tag.trim())
@@ -91,9 +90,7 @@ export const getFeaturedCommunityConfigs = (): Array<
       aTag,
     };
   });
-  featuredCommunityConfigs.forEach(config => {
-    console.log('config', config);
-  });
+
   return featuredCommunityConfigs.filter(
     (config): config is CommunityATagParts & { aTag: string } => config !== null
   );
@@ -263,6 +260,50 @@ export const createUpdatedCommunityDefinitionWithModerator = (
   moderatorTags.push(newModeratorTag);
 
   // Combine all tags: existing non-moderator tags + all moderator tags
+  const allTags = [...existingTags, ...moderatorTags];
+
+  return {
+    kind: 34550,
+    pubkey: currentEvent.pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: allTags,
+    content: currentEvent.content,
+  };
+};
+
+/**
+ * Creates an updated community definition event with a moderator removed
+ * This is a replaceable event (kind 34550 with d tag), so publishing this will replace the old one
+ * @param currentEvent - The current community definition event
+ * @param moderatorPubkeyToRemove - The public key of the moderator to remove
+ * @returns Unsigned event with the moderator removed
+ */
+export const createUpdatedCommunityDefinitionWithoutModerator = (
+  currentEvent: Event,
+  moderatorPubkeyToRemove: string
+): UnsignedEvent => {
+  // Get the d tag (identifier) from the current event
+  const dTag = currentEvent.tags.find(tag => tag[0] === 'd');
+  if (!dTag || !dTag[1]) {
+    throw new Error('Current community event must have a d tag');
+  }
+
+  // Get all existing tags except moderator p tags
+  const existingTags = currentEvent.tags.filter(
+    tag => !(tag[0] === 'p' && tag[3] === 'moderator')
+  );
+
+  // Get existing moderators and filter out the one to remove
+  const moderatorTags = currentEvent.tags
+    .filter(
+      tag =>
+        tag[0] === 'p' &&
+        tag[3] === 'moderator' &&
+        tag[1] !== moderatorPubkeyToRemove
+    )
+    .map(tag => [...tag]); // Clone the tag arrays
+
+  // Combine all tags: existing non-moderator tags + remaining moderator tags
   const allTags = [...existingTags, ...moderatorTags];
 
   return {

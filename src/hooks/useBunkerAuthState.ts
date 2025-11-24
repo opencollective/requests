@@ -193,7 +193,6 @@ export function useBunkerAuthState(): BunkerAuthState {
   useEffect(() => {
     const loadStoredBunkerData = async () => {
       try {
-        console.log('loadStoredBunkerData');
         const [token, secretKey, publicKey] = await Promise.all([
           storage.loadBunkerToken(),
           storage.loadBunkerLocalSecretKey(),
@@ -211,7 +210,6 @@ export function useBunkerAuthState(): BunkerAuthState {
           }
           await connectToBunkerWithRetry(bunkerConnectionConfiguration, 10000);
         }
-        console.log(token, secretKey, publicKey);
       } catch (error) {
         console.error('Failed to load bunker data from storage:', error);
       }
@@ -223,7 +221,6 @@ export function useBunkerAuthState(): BunkerAuthState {
   const handleBunkerConnectionToken = useCallback(
     async (bunkerConnectionToken: string, localSecretKey: Uint8Array) => {
       try {
-        console.log('handleBunkerConnectionToken');
         const bunkerConnectionConfiguration = await configureBunkerConnection(
           bunkerConnectionToken,
           localSecretKey

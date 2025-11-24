@@ -78,6 +78,7 @@ export function useModeratorRequests(
   }, [communityPubkey, communityIdentifier, isConnected, pool, relays]);
 
   const refreshRequests = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
     await fetchRequests();
   }, [fetchRequests]);
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  finalizeEvent,
   generateSecretKey,
   getPublicKey,
   type Event,
@@ -9,6 +10,7 @@ import { useNostrConnectionState } from '../hooks/useNostrConnectionState';
 import { useBunkerAuthState } from '../hooks/useBunkerAuthState';
 import { useEventQueue } from '../hooks/useEventQueue';
 import { useUserMetadata } from '../hooks/useUserMetadata';
+import { useSecretKeyAuthState } from '../hooks/useSecretKeyAuthState';
 import { NostrContext, type NostrContextType } from './NostrContext';
 import {
   bunkerSignerfromURI,
@@ -25,29 +27,54 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   // Use custom hooks for different state management
   const connectionState = useNostrConnectionState();
   const bunkerAuth = useBunkerAuthState();
+  const secretKeyAuth = useSecretKeyAuthState();
 
   // Compute userPublicKey as async value
   const [userPublicKey, setUserPublicKey] = useState<string | null>(null);
 
   // Update userPublicKey when authentication state changes
   useEffect(() => {
-    const updateUserPublicKey = async () => {
-      let pubkey: string | null = null;
+    let isCancelled = false;
 
-      if (bunkerAuth.bunkerSigner && bunkerAuth.bunkerStatus === 'connected') {
-        // Get public key from bunker auth state
-        try {
-          pubkey = (await bunkerAuth.bunkerSigner.getPublicKey()) || null;
-        } catch (err) {
-          console.error('Failed to get public key from bunker signer:', err);
+    const updateUserPublicKey = async () => {
+      try {
+        if (secretKeyAuth.localSecretKey) {
+          const pubkey = getPublicKey(secretKeyAuth.localSecretKey);
+          if (!isCancelled) {
+            setUserPublicKey(pubkey);
+          }
+          return;
+        }
+
+        if (
+          bunkerAuth.bunkerSigner &&
+          bunkerAuth.bunkerStatus === 'connected'
+        ) {
+          const pubkey = (await bunkerAuth.bunkerSigner.getPublicKey()) || null;
+          if (!isCancelled) {
+            setUserPublicKey(pubkey);
+          }
+          return;
+        }
+
+        if (!isCancelled) {
+          setUserPublicKey(null);
+        }
+      } catch (err) {
+        console.error('Failed to get public key:', err);
+        if (!isCancelled) {
+          setUserPublicKey(null);
         }
       }
-
-      setUserPublicKey(pubkey);
     };
 
     updateUserPublicKey();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [
+    secretKeyAuth.localSecretKey,
     bunkerAuth.bunkerConnectionConfiguration,
     bunkerAuth.bunkerSigner,
     bunkerAuth.bunkerStatus,
@@ -65,13 +92,15 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const [popup, setPopup] = useState<Window | null>(null);
 
   const hasSigningMethod = useMemo(
-    () => !!bunkerAuth.bunkerSigner,
-    [bunkerAuth.bunkerSigner]
+    () => !!secretKeyAuth.localSecretKey || !!bunkerAuth.bunkerSigner,
+    [secretKeyAuth.localSecretKey, bunkerAuth.bunkerSigner]
   );
 
   const isConfigured = useMemo(
-    () => !!bunkerAuth.bunkerConnectionConfiguration,
-    [bunkerAuth.bunkerConnectionConfiguration]
+    () =>
+      !!secretKeyAuth.localSecretKey ||
+      !!bunkerAuth.bunkerConnectionConfiguration,
+    [secretKeyAuth.localSecretKey, bunkerAuth.bunkerConnectionConfiguration]
   );
 
   // Send event (requires authentication)
@@ -96,6 +125,20 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const signAndSendEvent = useCallback(
     async (event: UnsignedEvent) => {
       // Event needs to be signed first
+      if (secretKeyAuth.localSecretKey) {
+        const signedEvent = finalizeEvent(
+          {
+            kind: event.kind,
+            content: event.content,
+            tags: event.tags,
+            created_at: event.created_at,
+          },
+          secretKeyAuth.localSecretKey
+        );
+
+        return sendVerifiedEvent(signedEvent);
+      }
+
       if (bunkerAuth.bunkerSigner) {
         // Sign with bunker signer
         const signedEvent = await bunkerAuth.bunkerSigner.signEvent({
@@ -106,11 +149,11 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         });
 
         return sendVerifiedEvent(signedEvent);
-      } else {
-        throw new Error('No signing method available');
       }
+
+      throw new Error('No signing method available');
     },
-    [bunkerAuth.bunkerSigner, sendVerifiedEvent]
+    [secretKeyAuth.localSecretKey, bunkerAuth.bunkerSigner, sendVerifiedEvent]
   );
 
   // Initialize event queue with the sendEvent function
@@ -135,9 +178,12 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
   // Logout function that clears all states
   const logout = useCallback(async () => {
-    await bunkerAuth.bunkerLogout();
+    await Promise.all([
+      secretKeyAuth.secretKeyLogout(),
+      bunkerAuth.bunkerLogout(),
+    ]);
     eventQueue.clearQueue();
-  }, [bunkerAuth, eventQueue]);
+  }, [secretKeyAuth, bunkerAuth, eventQueue]);
 
   // Process queue when authentication becomes available
   React.useEffect(() => {
@@ -149,7 +195,13 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         eventQueue.processQueue();
       }
     }
-  }, [hasSigningMethod, isConfigured, eventQueue, bunkerAuth.bunkerSigner]);
+  }, [
+    hasSigningMethod,
+    isConfigured,
+    eventQueue,
+    secretKeyAuth.localSecretKey,
+    bunkerAuth.bunkerSigner,
+  ]);
 
   const handleOpenBunkerSuccess = useCallback(
     (openBunkerEvent: MessageEvent<OpenBunkerAuthSuccessEvent>) => {
@@ -198,7 +250,6 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       bunkerSignerfromURI(localSecretKey, connectionUri),
       popupPromise,
     ]);
-    console.log('bunkerSigner:', bunkerSigner);
 
     // If we get here, connection was successful
     await bunkerAuth.connected(bunkerSigner, localSecretKey);
@@ -300,6 +351,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
     isConfigured,
     userPublicKey,
+    // Secret key authentication state
+    ...secretKeyAuth,
     // Bunker authentication state
     ...bunkerAuth,
 

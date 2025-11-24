@@ -2,22 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../hooks/useNostr';
 import { useRequests, type RequestData } from '../hooks/useRequests';
-import { useModeratorRequests } from '../hooks/useModeratorRequests';
 import { ConnectionStatusBox } from '../components/ConnectionStatusBox';
 import {
   RequestFilterControls,
   type RequestFilter,
 } from '../components/RequestFilterControls';
-import { ModeratorRequestsSection } from '../components/ModeratorRequestsSection';
+import { CommunityInfo } from '../components/CommunityInfo';
 import { useCommunityContext } from '../hooks/useCommunityContext';
-import { getCommunityATag } from '../utils/communityUtils';
-import { isModerator } from '../utils/statusEventUtils';
-import { createModeratorRequestEvent } from '../utils/moderatorRequestUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, metadata, userPublicKey, pool, relays, submitEvent } =
-    useNostr();
+  const { isConnected, metadata, userPublicKey } = useNostr();
   const communityContext = useCommunityContext();
 
   // Call all hooks unconditionally before any early returns
@@ -25,28 +20,7 @@ export const DashboardPage: React.FC = () => {
     moderators: communityContext?.communityInfo?.moderators || [],
   });
 
-  const {
-    requests: moderatorRequests,
-    isLoading: isLoadingModeratorRequests,
-    hasUserRequested,
-    refreshRequests: refreshModeratorRequests,
-  } = useModeratorRequests(
-    communityContext?.communityPubkey,
-    communityContext?.communityIdentifier,
-    userPublicKey,
-    isConnected,
-    pool,
-    relays
-  );
-
   const [activeFilter, setActiveFilter] = useState<RequestFilter>('all');
-  const [isCommunityInfoExpanded, setIsCommunityInfoExpanded] = useState(false);
-  const [isSubmittingModeratorRequest, setIsSubmittingModeratorRequest] =
-    useState(false);
-  const [moderatorRequestError, setModeratorRequestError] = useState<
-    string | null
-  >(null);
-  const [moderatorRequestMessage, setModeratorRequestMessage] = useState('');
 
   useEffect(() => {
     if (isConnected && communityContext) {
@@ -76,19 +50,7 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const {
-    communityId,
-    communityInfo,
-    isCommunityLoading,
-    communityError,
-    communityPubkey,
-    communityIdentifier,
-  } = communityContext;
-  const isLoggedIn = Boolean(userPublicKey);
-  const userIsModerator =
-    userPublicKey && communityInfo
-      ? isModerator(userPublicKey, communityInfo.moderators)
-      : false;
+  const { communityId, isCommunityLoading, communityError } = communityContext;
 
   const encodedCommunityId = communityId
     ? encodeURIComponent(communityId)
@@ -103,57 +65,6 @@ export const DashboardPage: React.FC = () => {
   const handleNewRequest = () => {
     if (encodedCommunityId) {
       navigate(`/community/${encodedCommunityId}/request`);
-    }
-  };
-
-  const handleRequestModerator = async () => {
-    // Provide more specific error messages to help debug
-    if (!communityPubkey) {
-      setModeratorRequestError(
-        'Community pubkey is missing. Please refresh the page.'
-      );
-      return;
-    }
-    if (!communityIdentifier) {
-      setModeratorRequestError(
-        'Community identifier is missing. Please refresh the page.'
-      );
-      return;
-    }
-    if (!submitEvent) {
-      setModeratorRequestError(
-        'Event submission not available. Please refresh the page.'
-      );
-      return;
-    }
-
-    setIsSubmittingModeratorRequest(true);
-    setModeratorRequestError(null);
-
-    try {
-      // Create the moderator request event
-      const requestEvent = createModeratorRequestEvent(
-        communityPubkey,
-        communityIdentifier,
-        userPublicKey || '', // Will be set when signed
-        moderatorRequestMessage ||
-          'I would like to join this community as a moderator.'
-      );
-
-      // Add to event queue for later processing (same pattern as RequestPage)
-      submitEvent(requestEvent);
-
-      // Clear the message and refresh requests
-      setModeratorRequestMessage('');
-      await refreshModeratorRequests();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Failed to submit moderator request';
-      setModeratorRequestError(errorMessage);
-    } finally {
-      setIsSubmittingModeratorRequest(false);
     }
   };
 
@@ -220,7 +131,7 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Show error if community from URL couldn't be loaded
-  if (communityError && !communityInfo) {
+  if (communityError && !communityContext?.communityInfo) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
@@ -241,13 +152,6 @@ export const DashboardPage: React.FC = () => {
       </div>
     );
   }
-
-  const communityATag = communityInfo
-    ? getCommunityATag(communityInfo.pubkey, communityInfo.identifier)
-    : null;
-  const chorusUrl = communityATag
-    ? `https://chorus.community/group/${encodeURIComponent(communityATag)}`
-    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -278,7 +182,7 @@ export const DashboardPage: React.FC = () => {
               </button>
             </div>
             <div className="flex items-center gap-2">
-              {isLoggedIn && (
+              {userPublicKey && (
                 <button
                   type="button"
                   onClick={() => navigate('/profile')}
@@ -306,173 +210,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Community Header */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
-          <div
-            className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-            onClick={() => setIsCommunityInfoExpanded(!isCommunityInfoExpanded)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                setIsCommunityInfoExpanded(!isCommunityInfoExpanded);
-              }
-            }}
-            aria-label={isCommunityInfoExpanded ? 'Collapse' : 'Expand'}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4 flex-1">
-                {communityInfo?.image && (
-                  <img
-                    src={communityInfo.image}
-                    alt={communityInfo.name}
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold text-gray-900">
-                      {communityInfo?.name || 'Community Requests'}
-                    </h1>
-                    {chorusUrl && (
-                      <a
-                        href={chorusUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-                        title="View on Chorus"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                      </a>
-                    )}
-                  </div>
-                  {communityInfo?.description && (
-                    <p className="text-gray-600 text-sm mb-2">
-                      {communityInfo.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    {communityInfo?.moderators &&
-                      communityInfo.moderators.length > 0 && (
-                        <span>
-                          {communityInfo.moderators.length} moderator
-                          {communityInfo.moderators.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="p-2 text-gray-400 pointer-events-none">
-                  <svg
-                    className={`w-5 h-5 transition-transform ${
-                      isCommunityInfoExpanded ? 'rotate-180' : ''
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Expanded Community Info */}
-            {isCommunityInfoExpanded && communityInfo && (
-              <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-                <div className="text-xs text-gray-500">
-                  Created:{' '}
-                  {new Date(
-                    communityInfo.createdAt * 1000
-                  ).toLocaleDateString()}
-                </div>
-                {communityInfo.moderators.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">
-                      Moderators
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {communityInfo.moderators.map(
-                        (moderator: string, index: number) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-mono"
-                          >
-                            {moderator.slice(0, 8)}...{moderator.slice(-4)}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {(communityInfo.relays.author ||
-                  communityInfo.relays.requests ||
-                  communityInfo.relays.approvals ||
-                  (communityInfo.relays.general &&
-                    communityInfo.relays.general.length > 0)) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">
-                      Relays
-                    </h4>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      {communityInfo.relays.author && (
-                        <div>
-                          <span className="font-medium">Author:</span>{' '}
-                          {communityInfo.relays.author}
-                        </div>
-                      )}
-                      {communityInfo.relays.requests && (
-                        <div>
-                          <span className="font-medium">Requests:</span>{' '}
-                          {communityInfo.relays.requests}
-                        </div>
-                      )}
-                      {communityInfo.relays.approvals && (
-                        <div>
-                          <span className="font-medium">Approvals:</span>{' '}
-                          {communityInfo.relays.approvals}
-                        </div>
-                      )}
-                      {communityInfo.relays.general &&
-                        communityInfo.relays.general.length > 0 && (
-                          <div>
-                            <span className="font-medium">General:</span>{' '}
-                            {communityInfo.relays.general.join(', ')}
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <CommunityInfo />
         {/* Action Bar */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -510,73 +248,6 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Moderator Requests Section - Only visible to moderators */}
-        {userIsModerator && (
-          <div className="mb-6">
-            <ModeratorRequestsSection
-              requests={moderatorRequests}
-              isLoading={isLoadingModeratorRequests}
-              onRefresh={refreshModeratorRequests}
-            />
-          </div>
-        )}
-
-        {/* Request to be Moderator Section - Only visible to non-moderators who are logged in */}
-        {isLoggedIn && !userIsModerator && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Request to be a Moderator
-            </h2>
-            {hasUserRequested ? (
-              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md">
-                <p className="text-sm">
-                  You have already submitted a request to become a moderator.
-                  Please wait for a moderator to review your request.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="moderator-request-message"
-                    className="block text-sm font-medium text-gray-700 mb-2"
-                  >
-                    Message (optional)
-                  </label>
-                  <textarea
-                    id="moderator-request-message"
-                    value={moderatorRequestMessage}
-                    onChange={e => setModeratorRequestMessage(e.target.value)}
-                    placeholder="I would like to join this community as a moderator..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    rows={3}
-                  />
-                </div>
-                {moderatorRequestError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                    {moderatorRequestError}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={handleRequestModerator}
-                  disabled={isSubmittingModeratorRequest}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmittingModeratorRequest ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Request to be Moderator'
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (
