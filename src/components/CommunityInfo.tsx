@@ -241,6 +241,17 @@ export const CommunityInfo: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!userIsOwner || !isExpanded) {
+      return;
+    }
+
+    refreshModeratorRequests().catch(error => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to refresh moderator requests:', error);
+    });
+  }, [userIsOwner, isExpanded, refreshModeratorRequests]);
+
   if (!communityInfo) {
     return null;
   }
