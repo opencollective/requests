@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import WebSocket from 'ws';
 import {
   nip19,
   getPublicKey,
@@ -10,6 +11,11 @@ import {
   SimplePool,
   type UnsignedEvent,
 } from 'nostr-tools';
+
+const nodeWebSocket = WebSocket as unknown as typeof globalThis.WebSocket;
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = nodeWebSocket;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -346,9 +352,13 @@ test('request to become a moderator', async ({ browser }) => {
   await teamMemberPage
     .getByRole('button', { name: 'Collapse' })
     .press('ControlOrMeta+`');
-  await teamMemberPage
-    .getByRole('button', { name: 'Request to be Moderator' })
-    .click();
+  const requestModeratorButton = teamMemberPage.getByRole('button', {
+    name: 'Request to be Moderator',
+  });
+
+  await expect(requestModeratorButton).toBeVisible({ timeout: 15000 });
+  await expect(requestModeratorButton).toBeEnabled();
+  await requestModeratorButton.click();
   await teamMemberPage
     .getByRole('textbox', { name: 'Message (optional)' })
     .click();
