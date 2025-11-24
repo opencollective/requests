@@ -352,9 +352,14 @@ test('request to become a moderator', async ({ browser }) => {
   await teamMemberPage
     .getByRole('button', { name: 'Collapse' })
     .press('ControlOrMeta+`');
-  await teamMemberPage
-    .getByRole('button', { name: 'Request to be Moderator' })
-    .click();
+  const requestModeratorButton = teamMemberPage.getByRole('button', {
+    name: 'Request to be Moderator',
+  });
+
+  // await teamMemberPage.pause();
+  await expect(requestModeratorButton).toBeVisible({ timeout: 15000 });
+  await expect(requestModeratorButton).toBeEnabled();
+  await requestModeratorButton.click();
   await teamMemberPage
     .getByRole('textbox', { name: 'Message (optional)' })
     .click();
