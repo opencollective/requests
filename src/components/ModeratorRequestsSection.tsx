@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import type { ModeratorRequestData } from '../utils/moderatorRequestUtils';
 import { useNostr } from '../hooks/useNostr';
 import { useCommunityContext } from '../hooks/useCommunityContext';
@@ -23,20 +23,6 @@ export const ModeratorRequestsSection: React.FC<
     null
   );
   const [error, setError] = useState<string | null>(null);
-
-  // Filter out requests from users who are already moderators
-  // This hook must be called before any early returns
-  const filteredRequests = useMemo(() => {
-    if (
-      !communityContext?.communityInfo?.moderators ||
-      communityContext.communityInfo.moderators.length === 0
-    ) {
-      return requests;
-    }
-
-    const moderatorSet = new Set(communityContext.communityInfo.moderators);
-    return requests.filter(request => !moderatorSet.has(request.pubkey));
-  }, [requests, communityContext?.communityInfo?.moderators]);
 
   if (!communityContext) {
     return null;
@@ -134,7 +120,7 @@ export const ModeratorRequestsSection: React.FC<
     );
   }
 
-  if (filteredRequests.length === 0) {
+  if (requests.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -148,7 +134,7 @@ export const ModeratorRequestsSection: React.FC<
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">
-        Moderator Requests ({filteredRequests.length})
+        Moderator Requests ({requests.length})
       </h2>
 
       {error && (
@@ -158,7 +144,7 @@ export const ModeratorRequestsSection: React.FC<
       )}
 
       <div className="space-y-3">
-        {filteredRequests.map(request => {
+        {requests.map(request => {
           const isProcessing = processingRequestId === request.id;
 
           return (

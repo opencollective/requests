@@ -61,21 +61,22 @@ export const CommunityInfo: React.FC = () => {
   );
 
   // Filter out requests from users who are already moderators
-  // This gives us the count of "new" or "pending" requests
-  const pendingModeratorRequestsCount = useMemo(() => {
+  const filteredModeratorRequests = useMemo(() => {
     if (
       !communityInfo?.moderators ||
       communityInfo.moderators.length === 0 ||
       moderatorRequests.length === 0
     ) {
-      return moderatorRequests.length;
+      return moderatorRequests;
     }
 
     const moderatorSet = new Set(communityInfo.moderators);
     return moderatorRequests.filter(
       request => !moderatorSet.has(request.pubkey)
-    ).length;
+    );
   }, [moderatorRequests, communityInfo?.moderators]);
+
+  const pendingModeratorRequestsCount = filteredModeratorRequests.length;
 
   const communityATag = communityInfo
     ? getCommunityATag(communityInfo.pubkey, communityInfo.identifier)
@@ -256,7 +257,7 @@ export const CommunityInfo: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900">
                   {communityInfo?.name || 'Community Requests'}
                 </h1>
-                {userIsModerator &&
+                {userIsOwner &&
                   pendingModeratorRequestsCount > 0 &&
                   !isLoadingModeratorRequests && (
                     <div
@@ -460,7 +461,7 @@ export const CommunityInfo: React.FC = () => {
                 {userIsOwner && (
                   <div>
                     <ModeratorRequestsSection
-                      requests={moderatorRequests}
+                      requests={filteredModeratorRequests}
                       isLoading={isLoadingModeratorRequests}
                       onRefresh={refreshModeratorRequests}
                     />
