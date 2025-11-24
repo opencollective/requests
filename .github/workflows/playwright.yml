@@ -1,0 +1,60 @@
+name: Playwright E2E
+
+on:
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Playwright (Chromium, headless)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore seed data fixture
+        env:
+          PLAYWRIGHT_SEED_DATA_JSON: ${{ secrets.PLAYWRIGHT_SEED_DATA_JSON }}
+        run: |
+          if [ -z "$PLAYWRIGHT_SEED_DATA_JSON" ]; then
+            echo "Missing PLAYWRIGHT_SEED_DATA_JSON secret" >&2
+            exit 1
+          fi
+          mkdir -p tests/fixtures
+          echo "$PLAYWRIGHT_SEED_DATA_JSON" | base64 --decode > tests/fixtures/seed-data.json
+
+      - name: Install Playwright (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: pnpm test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
